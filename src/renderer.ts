@@ -1,64 +1,110 @@
-import { chromium, Browser, Page, PageScreenshotOptions } from 'playwright';
+import { chromium, Browser, Page, PageScreenshotOptions, BrowserContext } from 'playwright';
 import { SketchConfig, RenderOptions, FrameData, RenderResult } from './types.js';
+import { cpus } from 'os';
 
 export class P5Renderer {
   private browser: Browser | null = null;
-  private page: Page | null = null;
+  private static sharedBrowser: Browser | null = null;
+  private static browserRefCount = 0;
 
   async initialize(): Promise<void> {
-    this.browser = await chromium.launch({ headless: true });
-    this.page = await this.browser.newPage();
+    if (!P5Renderer.sharedBrowser) {
+      P5Renderer.sharedBrowser = await chromium.launch({ 
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-software-rasterizer',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding'
+        ]
+      });
+    }
+    P5Renderer.browserRefCount++;
+    this.browser = P5Renderer.sharedBrowser;
   }
 
   async renderSketch(config: SketchConfig, options: RenderOptions = {}): Promise<RenderResult> {
-    if (!this.page) {
+    if (!this.browser) {
       throw new Error('Renderer not initialized. Call initialize() first.');
     }
 
     const totalFrames = Math.ceil(config.frameRate * config.durationSeconds);
-    const frames: FrameData[] = [];
     const startTime = Date.now();
 
-    const htmlContent = this.createSketchHTML(config);
-    await this.page.setContent(htmlContent, { waitUntil: 'networkidle' });
-    await this.page.setViewportSize({ width: config.width, height: config.height });
+    // Determine optimal concurrency based on CPU cores and frame count
+    const cpuCount = cpus().length;
+    const maxConcurrency = Math.min(cpuCount * 2, Math.max(2, Math.ceil(totalFrames / 6)));
+    const frameNumbers = Array.from({ length: totalFrames }, (_, i) => i);
+    
+    // Distribute frames more evenly across contexts
+    const chunks = this.distributeFrames(frameNumbers, maxConcurrency);
 
-    // Wait for p5.js to load and sketch to start
-    await this.page.waitForFunction('window.p5 && window.sketchReady', { timeout: 10000 });
+    const frames: FrameData[] = [];
 
-    for (let frameNumber = 0; frameNumber < totalFrames; frameNumber++) {
-      // Set the frame number for deterministic rendering
-      await this.page.evaluate((frame: number) => {
-        globalThis.currentFrame = frame;
-      }, frameNumber);
+    // Process chunks in parallel with optimized contexts
+    const chunkPromises = chunks.map(async (chunk) => {
+      const context = await this.browser!.newContext({
+        viewport: { width: config.width, height: config.height }
+      });
+      const page = await context.newPage();
+      
+      try {
+        // Set optimized page settings
+        await page.setExtraHTTPHeaders({
+          'Cache-Control': 'no-cache'
+        });
 
-      // Trigger a redraw
-      await this.page.evaluate(() => {
-        if (globalThis.redraw) {
-          globalThis.redraw();
+        const htmlContent = this.createOptimizedSketchHTML(config);
+        await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
+
+        // Wait for p5.js to load and sketch to start with shorter timeout
+        await page.waitForFunction('window.p5 && window.sketchReady', { timeout: 5000 });
+
+        const chunkFrames: FrameData[] = [];
+
+        // Process all frames in this chunk efficiently
+        for (const frameNumber of chunk) {
+          // Batch frame setup and rendering in one evaluate call
+          await page.evaluate((frame: number) => {
+            globalThis.currentFrame = frame;
+            if (globalThis.redraw) {
+              globalThis.redraw();
+            }
+          }, frameNumber);
+
+          const screenshotOptions: PageScreenshotOptions = {
+            type: options.format || 'jpeg', // Default to JPEG for speed
+            clip: { x: 0, y: 0, width: config.width, height: config.height },
+            quality: options.quality || 80, // Optimized quality vs speed
+            animations: 'disabled' // Disable CSS animations
+          };
+          
+          const screenshot = await page.screenshot(screenshotOptions);
+
+          chunkFrames.push({
+            frameNumber,
+            timestamp: frameNumber / config.frameRate,
+            buffer: screenshot
+          });
         }
-      });
 
-      // Small delay to ensure frame is rendered
-      await this.page.waitForTimeout(16); // ~60fps worth of wait
-
-      const screenshotOptions: PageScreenshotOptions = {
-        type: options.format || 'png',
-        clip: { x: 0, y: 0, width: config.width, height: config.height }
-      };
-      
-      if (options.quality !== undefined) {
-        screenshotOptions.quality = options.quality;
+        return chunkFrames;
+      } finally {
+        await context.close();
       }
-      
-      const screenshot = await this.page.screenshot(screenshotOptions);
+    });
 
-      frames.push({
-        frameNumber,
-        timestamp: frameNumber / config.frameRate,
-        buffer: screenshot
-      });
+    // Wait for all chunks to complete and flatten results
+    const chunkResults = await Promise.all(chunkPromises);
+    for (const chunkFrames of chunkResults) {
+      frames.push(...chunkFrames);
     }
+
+    // Sort frames by frame number to ensure correct order
+    frames.sort((a, b) => a.frameNumber - b.frameNumber);
 
     const durationMs = Date.now() - startTime;
 
@@ -69,7 +115,24 @@ export class P5Renderer {
     };
   }
 
-  private createSketchHTML(config: SketchConfig): string {
+  private distributeFrames(frames: number[], numChunks: number): number[][] {
+    // Round-robin distribution for better load balancing
+    const chunks: number[][] = Array.from({ length: numChunks }, () => []);
+    frames.forEach((frame, index) => {
+      chunks[index % numChunks].push(frame);
+    });
+    return chunks.filter(chunk => chunk.length > 0);
+  }
+
+  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+
+  private createOptimizedSketchHTML(config: SketchConfig): string {
     return `
 <!DOCTYPE html>
 <html>
@@ -85,6 +148,11 @@ export class P5Renderer {
     }
     canvas { 
       display: block; 
+      image-rendering: optimizeSpeed;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
     }
   </style>
 </head>
@@ -92,6 +160,11 @@ export class P5Renderer {
   <script>
     window.currentFrame = 0;
     window.sketchReady = false;
+    
+    // Performance optimizations
+    if (window.performance && window.performance.mark) {
+      window.performance.mark('sketch-start');
+    }
     
     // User sketch code first
     ${config.code}
@@ -103,6 +176,9 @@ export class P5Renderer {
     window.setup = function() {
       createCanvas(${config.width}, ${config.height});
       frameRate(${config.frameRate});
+      
+      // Disable loops to prevent unwanted redraws
+      noLoop();
       
       // Call user setup if it exists
       if (userSetup) {
@@ -126,15 +202,21 @@ export class P5Renderer {
 </html>`;
   }
 
+  private createSketchHTML(config: SketchConfig): string {
+    return this.createOptimizedSketchHTML(config);
+  }
+
 
   async cleanup(): Promise<void> {
-    if (this.page) {
-      await this.page.close();
-      this.page = null;
+    P5Renderer.browserRefCount--;
+    
+    // Only close shared browser when no more instances are using it
+    if (P5Renderer.browserRefCount <= 0 && P5Renderer.sharedBrowser) {
+      await P5Renderer.sharedBrowser.close();
+      P5Renderer.sharedBrowser = null;
+      P5Renderer.browserRefCount = 0;
     }
-    if (this.browser) {
-      await this.browser.close();
-      this.browser = null;
-    }
+    
+    this.browser = null;
   }
 }

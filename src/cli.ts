@@ -120,6 +120,22 @@ async function renderSketch(config: RenderConfig): Promise<void> {
   }
 }
 
+// Loading animation utilities
+function createSpinner() {
+  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let i = 0;
+  return {
+    frame: () => frames[i++ % frames.length],
+    dots: (elapsed: number) => '.'.repeat(Math.floor(elapsed / 1000) % 4)
+  };
+}
+
+function formatTime(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = (ms / 1000).toFixed(1);
+  return `${seconds}s`;
+}
+
 async function renderAllExamples(): Promise<void> {
   console.log('🎨 Rendering all example sketches...\n');
 
@@ -134,35 +150,68 @@ async function renderAllExamples(): Promise<void> {
     { name: 'tunnel-simple', duration: 3, frameRate: 24 }
   ];
 
-  const results = [];
-  const startTime = Date.now();
+  const results: Array<{ success: boolean; name: string; time?: number; error?: any }> = [];
+  const overallStartTime = Date.now();
   
-  for (const example of examples) {
+  for (let i = 0; i < examples.length; i++) {
+    const example = examples[i];
+    const spinner = createSpinner();
+    const startTime = Date.now();
+    
+    // Start loading animation
+    const progressText = `[${i + 1}/${examples.length}] 🚀 Rendering ${example.name}`;
+    let animationInterval: NodeJS.Timeout;
+    
+    const startAnimation = () => {
+      let elapsed = 0;
+      animationInterval = setInterval(() => {
+        elapsed += 200;
+        const spinnerFrame = spinner.frame();
+        const dots = spinner.dots(elapsed);
+        process.stdout.write(`\r${progressText} ${spinnerFrame}${dots}`);
+      }, 200);
+    };
+    
+    startAnimation();
+    
     try {
       await renderSketch({
         sketchName: example.name,
         frameRate: example.frameRate,
         duration: example.duration
       });
-      results.push({ success: true, name: example.name });
-      console.log('');
+      const renderTime = Date.now() - startTime;
+      clearInterval(animationInterval);
+      process.stdout.write(`\r${progressText} ✅ Completed in ${formatTime(renderTime)}\n`);
+      results.push({ success: true, name: example.name, time: renderTime });
     } catch (error) {
-      results.push({ success: false, name: example.name, error });
-      console.log('');
+      const renderTime = Date.now() - startTime;
+      clearInterval(animationInterval);
+      process.stdout.write(`\r${progressText} ❌ Failed after ${formatTime(renderTime)}\n`);
+      results.push({ success: false, name: example.name, time: renderTime, error });
     }
+    console.log('');
   }
   
-  const totalTime = Date.now() - startTime;
+  const totalTime = Date.now() - overallStartTime;
   const successful = results.filter(r => r.success);
   const failed = results.filter(r => !r.success);
   
   console.log('🎯 SUMMARY');
-  console.log('='.repeat(50));
+  console.log('='.repeat(60));
   console.log(`✅ Successful: ${successful.length}/${results.length}`);
   console.log(`❌ Failed: ${failed.length}/${results.length}`);
-  console.log(`⏱️  Total time: ${(totalTime / 1000).toFixed(1)}s\n`);
+  console.log(`⏱️  Total time: ${formatTime(totalTime)}\n`);
   
   if (successful.length > 0) {
+    console.log('📊 Render Times:');
+    successful.forEach(r => {
+      const frames = examples.find(e => e.name === r.name)!.frameRate * examples.find(e => e.name === r.name)!.duration;
+      const frameTime = r.time! / frames;
+      console.log(`  ✅ ${r.name.padEnd(20)} ${formatTime(r.time!).padStart(8)} (${frameTime.toFixed(1)}ms/frame)`);
+    });
+    console.log('');
+    
     console.log('📺 Created videos:');
     successful.forEach(r => {
       console.log(`  • output/${r.name}/${r.name}-animation.mp4`);
@@ -173,7 +222,7 @@ async function renderAllExamples(): Promise<void> {
   if (failed.length > 0) {
     console.log('💥 Failed renders:');
     failed.forEach(r => {
-      console.log(`  • ${r.name}`);
+      console.log(`  ❌ ${r.name.padEnd(20)} ${formatTime(r.time!).padStart(8)}`);
     });
     console.log('');
   }
