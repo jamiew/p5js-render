@@ -111,26 +111,32 @@ async function renderSketch(config: RenderConfig): Promise<RenderResult> {
 
     log(`  📁 Frames saved to ${outputDir}/`);
 
-    // Create video with FFmpeg
-    const videoFile = `${outputDir}/${outputName}-animation.mp4`;
-    const ffmpegCmd = `ffmpeg -y -r ${finalConfig.frameRate} -i "${outputDir}/frame_%04d.png" -c:v libx264 -pix_fmt yuv420p "${videoFile}"`;
+    // Create video with FFmpeg - save in both locations
+    const videoFileInDir = `${outputDir}/${outputName}-animation.mp4`;
+    const videoFileInOutput = `output/${outputName}.mp4`;
+    const ffmpegCmd = `ffmpeg -y -r ${finalConfig.frameRate} -i "${outputDir}/frame_%04d.png" -c:v libx264 -pix_fmt yuv420p "${videoFileInDir}"`;
     
     log(`  🎬 Creating video...`);
     try {
       execSync(ffmpegCmd, { stdio: 'pipe' });
-      log(`  ✅ Video created: ${videoFile}`);
+      
+      // Copy video to main output directory for easy browsing
+      fs.copyFileSync(videoFileInDir, videoFileInOutput);
+      
+      log(`  ✅ Video created: ${videoFileInOutput}`);
+      log(`  📁 Also saved: ${videoFileInDir}`);
       
       // Try to open the video
       if (!config.silent) {
         try {
           execSync('which open', { stdio: 'pipe' });
-          execSync(`open "${videoFile}"`, { stdio: 'pipe' });
+          execSync(`open "${videoFileInOutput}"`, { stdio: 'pipe' });
           log(`  📺 Opening video...`);
         } catch {
-          log(`  💡 Video ready: ${videoFile}`);
+          log(`  💡 Video ready: ${videoFileInOutput}`);
         }
       } else {
-        log(`  💡 Video ready: ${videoFile}`);
+        log(`  💡 Video ready: ${videoFileInOutput}`);
       }
     } catch (error) {
       log(`  ❌ FFmpeg error: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -314,7 +320,7 @@ async function renderAllExamples(): Promise<void> {
     
     console.log('📺 Created videos:');
     successful.forEach(r => {
-      console.log(`  • output/${r.name}/${r.name}-animation.mp4`);
+      console.log(`  • output/${r.name}.mp4`);
     });
     console.log('');
   }
