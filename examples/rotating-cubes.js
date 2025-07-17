@@ -1,27 +1,21 @@
 function setup() {
-  createCanvas(800, 600, WEBGL);
+  createCanvas(800, 600);
 }
 
 function draw() {
   background(0);
   
-  // Dynamic lighting based on time
   let time = frameCount * 0.02;
   
-  ambientLight(30);
-  directionalLight(255, 150, 100, cos(time), sin(time), -1);
-  pointLight(100, 200, 255, sin(time * 2) * 200, cos(time * 2) * 200, 100);
+  translate(width/2, height/2);
   
-  // Create a field of rotating cubes
+  // Create a field of rotating squares (2D version of cubes)
   for (let x = -3; x <= 3; x++) {
     for (let y = -2; y <= 2; y++) {
       push();
       
-      translate(x * 80, y * 80, sin(time + x + y) * 50);
-      
-      rotateX(time + x * 0.5);
-      rotateY(time * 1.2 + y * 0.3);
-      rotateZ(time * 0.8 + x * y * 0.1);
+      translate(x * 80, y * 80);
+      rotate(time + x * 0.5 + y * 0.3);
       
       // Color based on position and time
       let r = 255 * (sin(time + x) * 0.5 + 0.5);
@@ -31,7 +25,15 @@ function draw() {
       fill(r, g, b);
       noStroke();
       
-      box(30);
+      // Draw square with some perspective effects
+      let size = 30 + sin(time + x + y) * 10;
+      rect(-size/2, -size/2, size, size);
+      
+      // Add some depth effect with smaller squares
+      fill(r * 0.7, g * 0.7, b * 0.7);
+      let innerSize = size * 0.6;
+      rect(-innerSize/2, -innerSize/2, innerSize, innerSize);
+      
       pop();
     }
   }
