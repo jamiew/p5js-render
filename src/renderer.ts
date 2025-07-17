@@ -7,6 +7,24 @@ export class P5Renderer {
   private static sharedBrowser: Browser | null = null;
   private static browserRefCount = 0;
 
+  private parseCanvasDimensions(code: string): { width: number; height: number } | null {
+    // Look for createCanvas calls in the code
+    const createCanvasRegex = /createCanvas\s*\(\s*(\d+)\s*,\s*(\d+)/;
+    const match = code.match(createCanvasRegex);
+    
+    if (match) {
+      const width = parseInt(match[1], 10);
+      const height = parseInt(match[2], 10);
+      
+      // Validate dimensions are reasonable
+      if (width > 0 && height > 0 && width <= 4096 && height <= 4096) {
+        return { width, height };
+      }
+    }
+    
+    return null;
+  }
+
   async initialize(): Promise<void> {
     if (!P5Renderer.sharedBrowser) {
       P5Renderer.sharedBrowser = await chromium.launch({ 
@@ -31,7 +49,13 @@ export class P5Renderer {
       throw new Error('Renderer not initialized. Call initialize() first.');
     }
 
-    const totalFrames = Math.ceil(config.frameRate * config.durationSeconds);
+    // Parse canvas dimensions from the sketch code if available
+    const parsedDimensions = this.parseCanvasDimensions(config.code);
+    const actualConfig = parsedDimensions 
+      ? { ...config, width: parsedDimensions.width, height: parsedDimensions.height }
+      : config;
+
+    const totalFrames = Math.ceil(actualConfig.frameRate * actualConfig.durationSeconds);
     const startTime = Date.now();
 
     // Determine optimal concurrency based on CPU cores and frame count
@@ -47,7 +71,7 @@ export class P5Renderer {
     // Process chunks in parallel with optimized contexts
     const chunkPromises = chunks.map(async (chunk) => {
       const context = await this.browser!.newContext({
-        viewport: { width: config.width, height: config.height }
+        viewport: { width: actualConfig.width, height: actualConfig.height }
       });
       const page = await context.newPage();
       
@@ -57,7 +81,7 @@ export class P5Renderer {
           'Cache-Control': 'no-cache'
         });
 
-        const htmlContent = this.createOptimizedSketchHTML(config);
+        const htmlContent = this.createOptimizedSketchHTML(actualConfig);
         await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
 
         // Wait for p5.js to load and sketch to start with shorter timeout
@@ -77,7 +101,7 @@ export class P5Renderer {
 
           const screenshotOptions: PageScreenshotOptions = {
             type: options.format || 'jpeg', // Default to JPEG for speed
-            clip: { x: 0, y: 0, width: config.width, height: config.height },
+            clip: { x: 0, y: 0, width: actualConfig.width, height: actualConfig.height },
             quality: options.quality || 80, // Optimized quality vs speed
             animations: 'disabled' // Disable CSS animations
           };
@@ -86,7 +110,7 @@ export class P5Renderer {
 
           chunkFrames.push({
             frameNumber,
-            timestamp: frameNumber / config.frameRate,
+            timestamp: frameNumber / actualConfig.frameRate,
             buffer: screenshot
           });
         }

@@ -105,7 +105,7 @@ async function renderSketch(config: RenderConfig): Promise<RenderResult> {
     log(`  💾 Saving ${result.frames.length} frames to ${outputDir}/...`);
     result.frames.forEach((frame: ApiFrameData) => {
       const frameNumber = String(frame.frameNumber).padStart(4, '0');
-      const filename = path.join(outputDir, `frame_${frameNumber}.png`);
+      const filename = path.join(outputDir, `frame_${frameNumber}.jpg`);
       fs.writeFileSync(filename, Buffer.from(frame.data, 'base64'));
     });
 
@@ -114,7 +114,7 @@ async function renderSketch(config: RenderConfig): Promise<RenderResult> {
     // Create video with FFmpeg - save in both locations
     const videoFileInDir = `${outputDir}/${outputName}-animation.mp4`;
     const videoFileInOutput = `output/${outputName}.mp4`;
-    const ffmpegCmd = `ffmpeg -y -r ${finalConfig.frameRate} -i "${outputDir}/frame_%04d.png" -c:v libx264 -pix_fmt yuv420p "${videoFileInDir}"`;
+    const ffmpegCmd = `ffmpeg -y -r ${finalConfig.frameRate} -i "${outputDir}/frame_%04d.jpg" -c:v libx264 -pix_fmt yuv420p "${videoFileInDir}"`;
     
     log(`  🎬 Creating video...`);
     try {
