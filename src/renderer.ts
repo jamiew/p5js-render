@@ -100,9 +100,9 @@ export class P5Renderer {
           }, frameNumber);
 
           const screenshotOptions: PageScreenshotOptions = {
-            type: options.format || 'jpeg', // Default to JPEG for speed
+            type: options.format || 'png', // PNG for better quality
             clip: { x: 0, y: 0, width: actualConfig.width, height: actualConfig.height },
-            quality: options.quality || 80, // Optimized quality vs speed
+            quality: options.quality || 100, // High quality for PNG
             animations: 'disabled' // Disable CSS animations
           };
           
