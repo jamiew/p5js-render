@@ -12,6 +12,15 @@ interface RenderConfig {
   frameRate?: number;
   duration?: number;
   serverUrl?: string;
+  silent?: boolean;
+}
+
+interface RenderResult {
+  success: boolean;
+  name: string;
+  time: number;
+  output: string[];
+  error?: any;
 }
 
 const DEFAULT_CONFIG = {
@@ -48,12 +57,22 @@ async function loadSketchCode(config: RenderConfig): Promise<string> {
   throw new Error('Must provide sketchName, sketchUrl, or sketchCode');
 }
 
-async function renderSketch(config: RenderConfig): Promise<void> {
+async function renderSketch(config: RenderConfig): Promise<RenderResult> {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
   const outputName = config.sketchName || 'custom-sketch';
   const outputDir = `output/${outputName}`;
+  const startTime = Date.now();
+  const output: string[] = [];
   
-  console.log(`🚀 Rendering ${outputName}...`);
+  const log = (message: string) => {
+    if (config.silent) {
+      output.push(message);
+    } else {
+      console.log(message);
+    }
+  };
+  
+  log(`🚀 Rendering ${outputName}...`);
   
   try {
     const code = await loadSketchCode(config);
@@ -77,46 +96,55 @@ async function renderSketch(config: RenderConfig): Promise<void> {
     }
 
     const result = await response.json() as RenderApiResponse;
-    console.log(`  ✅ Rendered ${result.totalFrames} frames in ${result.durationMs}ms`);
+    log(`  ✅ Rendered ${result.totalFrames} frames in ${result.durationMs}ms`);
 
     // Create output directory
     fs.mkdirSync(outputDir, { recursive: true });
 
     // Save all frames
-    console.log(`  💾 Saving ${result.frames.length} frames to ${outputDir}/...`);
+    log(`  💾 Saving ${result.frames.length} frames to ${outputDir}/...`);
     result.frames.forEach((frame: ApiFrameData) => {
       const frameNumber = String(frame.frameNumber).padStart(4, '0');
       const filename = path.join(outputDir, `frame_${frameNumber}.png`);
       fs.writeFileSync(filename, Buffer.from(frame.data, 'base64'));
     });
 
-    console.log(`  📁 Frames saved to ${outputDir}/`);
+    log(`  📁 Frames saved to ${outputDir}/`);
 
     // Create video with FFmpeg
     const videoFile = `${outputDir}/${outputName}-animation.mp4`;
     const ffmpegCmd = `ffmpeg -y -r ${finalConfig.frameRate} -i "${outputDir}/frame_%04d.png" -c:v libx264 -pix_fmt yuv420p "${videoFile}"`;
     
-    console.log(`  🎬 Creating video...`);
+    log(`  🎬 Creating video...`);
     try {
       execSync(ffmpegCmd, { stdio: 'pipe' });
-      console.log(`  ✅ Video created: ${videoFile}`);
+      log(`  ✅ Video created: ${videoFile}`);
       
       // Try to open the video
-      try {
-        execSync('which open', { stdio: 'pipe' });
-        execSync(`open "${videoFile}"`, { stdio: 'pipe' });
-        console.log(`  📺 Opening video...`);
-      } catch {
-        console.log(`  💡 Video ready: ${videoFile}`);
+      if (!config.silent) {
+        try {
+          execSync('which open', { stdio: 'pipe' });
+          execSync(`open "${videoFile}"`, { stdio: 'pipe' });
+          log(`  📺 Opening video...`);
+        } catch {
+          log(`  💡 Video ready: ${videoFile}`);
+        }
+      } else {
+        log(`  💡 Video ready: ${videoFile}`);
       }
     } catch (error) {
-      console.error(`  ❌ FFmpeg error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      console.log(`  💡 Manual command: ${ffmpegCmd}`);
+      log(`  ❌ FFmpeg error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      log(`  💡 Manual command: ${ffmpegCmd}`);
     }
 
+    const time = Date.now() - startTime;
+    return { success: true, name: outputName, time, output };
+
   } catch (error) {
-    console.error(`❌ Error rendering ${outputName}:`, error instanceof Error ? error.message : 'Unknown error');
-    process.exit(1);
+    const time = Date.now() - startTime;
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    log(`❌ Error rendering ${outputName}: ${errorMsg}`);
+    return { success: false, name: outputName, time, output, error };
   }
 }
 
@@ -136,79 +164,151 @@ function formatTime(ms: number): string {
   return `${seconds}s`;
 }
 
-async function renderAllExamples(): Promise<void> {
-  console.log('🎨 Rendering all example sketches...\n');
+// Live progress tracking for parallel rendering
+interface SketchProgress {
+  name: string;
+  status: 'waiting' | 'running' | 'completed' | 'failed';
+  startTime?: number;
+  endTime?: number;
+  spinner: ReturnType<typeof createSpinner>;
+}
 
-  const examples = [
-    { name: 'rotating-cubes', duration: 3, frameRate: 24 },
-    { name: 'plasma-field', duration: 4, frameRate: 30 },
-    { name: 'fractal-tree', duration: 3, frameRate: 24 },
-    { name: 'psychedelic-spiral', duration: 4, frameRate: 30 },
-    { name: 'liquid-morphing', duration: 5, frameRate: 24 },
-    { name: 'oscilloscope-simple', duration: 3, frameRate: 24 },
-    { name: 'particle-galaxy', duration: 5, frameRate: 24 },
-    { name: 'tunnel-simple', duration: 3, frameRate: 24 }
-  ];
-
-  const results: Array<{ success: boolean; name: string; time?: number; error?: any }> = [];
-  const overallStartTime = Date.now();
+function displayProgressDashboard(sketches: SketchProgress[]) {
+  // Clear screen and reset cursor
+  process.stdout.write('\x1B[2J\x1B[0f');
   
-  for (let i = 0; i < examples.length; i++) {
-    const example = examples[i];
-    const spinner = createSpinner();
-    const startTime = Date.now();
+  console.log('🎨 Rendering all example sketches in parallel...\n');
+  
+  sketches.forEach(sketch => {
+    let elapsed = 0;
+    let timeStr = '';
     
-    // Start loading animation
-    const progressText = `[${i + 1}/${examples.length}] 🚀 Rendering ${example.name}`;
-    let animationInterval: NodeJS.Timeout;
+    if (sketch.status === 'completed' || sketch.status === 'failed') {
+      // Show final time for completed/failed sketches
+      elapsed = sketch.endTime! - sketch.startTime!;
+      timeStr = ` (${formatTime(elapsed)})`;
+    } else if (sketch.startTime) {
+      // Show running time for active sketches
+      elapsed = Date.now() - sketch.startTime;
+      timeStr = ` (${formatTime(elapsed)})`;
+    }
     
-    const startAnimation = () => {
-      let elapsed = 0;
-      animationInterval = setInterval(() => {
-        elapsed += 200;
-        const spinnerFrame = spinner.frame();
-        const dots = spinner.dots(elapsed);
-        process.stdout.write(`\r${progressText} ${spinnerFrame}${dots}`);
-      }, 200);
-    };
+    const statusIcon = {
+      waiting: '⏳',
+      running: sketch.spinner.frame(),
+      completed: '✅',
+      failed: '❌'
+    }[sketch.status];
     
-    startAnimation();
+    const dots = sketch.status === 'running' ? sketch.spinner.dots(elapsed) : '';
+    
+    console.log(`  ${statusIcon} ${sketch.name.padEnd(20)} ${sketch.status}${dots}${timeStr}`);
+  });
+  
+  const running = sketches.filter(s => s.status === 'running').length;
+  const completed = sketches.filter(s => s.status === 'completed').length;
+  const failed = sketches.filter(s => s.status === 'failed').length;
+  
+  console.log(`\n📊 Progress: ${completed}✅ ${failed}❌ ${running}🔄 / ${sketches.length} total`);
+}
+
+async function renderAllExamples(): Promise<void> {
+  // Dynamically discover all sketches in examples directory
+  const examplesDir = './examples';
+  const files = fs.readdirSync(examplesDir).filter(file => file.endsWith('.js'));
+  
+  const examples = files.map(file => {
+    const name = file.replace('.js', '');
+    // Use sane defaults for all sketches
+    return { name, duration: 3, frameRate: 24 };
+  });
+
+  const overallStartTime = Date.now();
+  const completedResults: RenderResult[] = [];
+  
+  // Initialize progress tracking
+  const sketches: SketchProgress[] = examples.map(ex => ({
+    name: ex.name,
+    status: 'waiting' as const,
+    spinner: createSpinner()
+  }));
+  
+  // Start live progress display
+  const progressInterval = setInterval(() => {
+    displayProgressDashboard(sketches);
+  }, 200);
+  
+  // Create promises for all renders
+  const renderPromises = examples.map(async (example, index) => {
+    const sketch = sketches[index];
+    
+    // Update status to running
+    sketch.status = 'running';
+    sketch.startTime = Date.now();
     
     try {
-      await renderSketch({
+      const result = await renderSketch({
         sketchName: example.name,
         frameRate: example.frameRate,
-        duration: example.duration
+        duration: example.duration,
+        silent: true // Capture output for later display
       });
-      const renderTime = Date.now() - startTime;
-      clearInterval(animationInterval);
-      process.stdout.write(`\r${progressText} ✅ Completed in ${formatTime(renderTime)}\n`);
-      results.push({ success: true, name: example.name, time: renderTime });
+      
+      sketch.status = result.success ? 'completed' : 'failed';
+      sketch.endTime = Date.now();
+      
+      // Display completed sketch output immediately
+      console.log(`\n${'='.repeat(60)}`);
+      console.log(`📋 OUTPUT FOR: ${example.name.toUpperCase()}`);
+      console.log(`${'='.repeat(60)}`);
+      result.output.forEach(line => console.log(line));
+      console.log(`⏱️  Completed in ${formatTime(result.time)}\n`);
+      
+      completedResults.push(result);
+      return result;
     } catch (error) {
-      const renderTime = Date.now() - startTime;
-      clearInterval(animationInterval);
-      process.stdout.write(`\r${progressText} ❌ Failed after ${formatTime(renderTime)}\n`);
-      results.push({ success: false, name: example.name, time: renderTime, error });
+      sketch.status = 'failed';
+      sketch.endTime = Date.now();
+      
+      const result: RenderResult = {
+        success: false,
+        name: example.name,
+        time: Date.now() - sketch.startTime!,
+        output: [`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`],
+        error
+      };
+      
+      completedResults.push(result);
+      return result;
     }
-    console.log('');
-  }
+  });
+  
+  // Wait for all renders to complete
+  await Promise.all(renderPromises);
+  
+  // Stop progress display
+  clearInterval(progressInterval);
+  
+  // Clear screen one final time and show summary
+  process.stdout.write('\x1B[2J\x1B[0f');
   
   const totalTime = Date.now() - overallStartTime;
-  const successful = results.filter(r => r.success);
-  const failed = results.filter(r => !r.success);
+  const successful = completedResults.filter(r => r.success);
+  const failed = completedResults.filter(r => !r.success);
   
-  console.log('🎯 SUMMARY');
+  console.log('🎯 PARALLEL RENDERING SUMMARY');
   console.log('='.repeat(60));
-  console.log(`✅ Successful: ${successful.length}/${results.length}`);
-  console.log(`❌ Failed: ${failed.length}/${results.length}`);
-  console.log(`⏱️  Total time: ${formatTime(totalTime)}\n`);
+  console.log(`✅ Successful: ${successful.length}/${completedResults.length}`);
+  console.log(`❌ Failed: ${failed.length}/${completedResults.length}`);
+  console.log(`⏱️  Total time: ${formatTime(totalTime)} (parallel execution!)\n`);
   
   if (successful.length > 0) {
-    console.log('📊 Render Times:');
+    console.log('📊 Individual Render Times:');
     successful.forEach(r => {
-      const frames = examples.find(e => e.name === r.name)!.frameRate * examples.find(e => e.name === r.name)!.duration;
-      const frameTime = r.time! / frames;
-      console.log(`  ✅ ${r.name.padEnd(20)} ${formatTime(r.time!).padStart(8)} (${frameTime.toFixed(1)}ms/frame)`);
+      const example = examples.find(e => e.name === r.name)!;
+      const frames = example.frameRate * example.duration;
+      const frameTime = r.time / frames;
+      console.log(`  ✅ ${r.name.padEnd(20)} ${formatTime(r.time).padStart(8)} (${frameTime.toFixed(1)}ms/frame)`);
     });
     console.log('');
     
@@ -222,7 +322,7 @@ async function renderAllExamples(): Promise<void> {
   if (failed.length > 0) {
     console.log('💥 Failed renders:');
     failed.forEach(r => {
-      console.log(`  ❌ ${r.name.padEnd(20)} ${formatTime(r.time!).padStart(8)}`);
+      console.log(`  ❌ ${r.name.padEnd(20)} ${formatTime(r.time).padStart(8)}`);
     });
     console.log('');
   }
@@ -285,7 +385,10 @@ Examples:
     config.sketchName = command;
   }
   
-  await renderSketch(config);
+  const result = await renderSketch(config);
+  if (!result.success) {
+    process.exit(1);
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

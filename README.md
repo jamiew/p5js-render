@@ -116,21 +116,38 @@ Renders all example sketches with cute loading animations and detailed timing in
 - Shows frames per second performance
 - Creates MP4 videos in `output/` directory
 
-### Render Specific Example
+### Render Single Example
 
 ```bash
 npm run render <sketch-name>
 ```
 
-Available sketches:
-- `rotating-cubes` - 3D cubes with dynamic lighting
-- `plasma-field` - Classic demoscene plasma effect  
+Examples:
+```bash
+npm run render rotating-cubes
+npm run render plasma-field
+npm run render simple-circle
+```
+
+Available sketches in `examples/` directory:
+- `algorithmic-terrain` - Procedural landscape generation
+- `cellular-agents` - Cellular automata simulation
+- `echo-worms` - Trailing particle effects
+- `fluid-paint` - Paint-like fluid dynamics
 - `fractal-tree` - Recursive animated tree
-- `psychedelic-spiral` - Colorful spiral patterns
+- `kaleidoscope-tunnel` - Symmetric tunnel patterns
+- `light-grid` - Grid of animated lights
 - `liquid-morphing` - Fluid-like transformations
 - `oscilloscope-simple` - Audio visualizer style
+- `oscilloscope-waves` - Wave-based audio visualization
 - `particle-galaxy` - Space particle simulation
+- `pastel-ribbons` - Soft flowing ribbons
+- `plasma-field` - Classic demoscene plasma effect
+- `psychedelic-spiral` - Colorful spiral patterns
+- `rotating-cubes` - 3D cubes with dynamic lighting
+- `simple-circle` - Basic animated circle
 - `tunnel-simple` - 3D tunnel effect
+- `voronoi-shards` - Voronoi diagram visualization
 
 ### Render from URL
 
