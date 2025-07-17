@@ -102,6 +102,60 @@ An animated recursive tree structure with:
 - Depth-based color variation
 - Multiple branching patterns
 
+## CLI Usage
+
+### Render All Example Sketches
+
+```bash
+npm run render:all
+```
+
+Renders all example sketches with cute loading animations and detailed timing info:
+- Shows progress with spinner and dots
+- Displays individual render times
+- Shows frames per second performance
+- Creates MP4 videos in `output/` directory
+
+### Render Specific Example
+
+```bash
+npm run render <sketch-name>
+```
+
+Available sketches:
+- `rotating-cubes` - 3D cubes with dynamic lighting
+- `plasma-field` - Classic demoscene plasma effect  
+- `fractal-tree` - Recursive animated tree
+- `psychedelic-spiral` - Colorful spiral patterns
+- `liquid-morphing` - Fluid-like transformations
+- `oscilloscope-simple` - Audio visualizer style
+- `particle-galaxy` - Space particle simulation
+- `tunnel-simple` - 3D tunnel effect
+
+### Render from URL
+
+```bash
+npm run render:url "https://gist.githubusercontent.com/user/123/raw/sketch.js"
+```
+
+Fetches and renders a p5.js sketch from any URL.
+
+### Render Inline Code
+
+```bash
+npm run render:code "function setup() { createCanvas(400,400); } function draw() { background(255,0,0); }"
+```
+
+Renders p5.js code directly from command line.
+
+### Environment Variables
+
+Customize rendering parameters:
+
+```bash
+WIDTH=1920 HEIGHT=1080 FRAMERATE=60 DURATION=5 npm run render rotating-cubes
+```
+
 ## Usage Examples
 
 ### Basic Usage
