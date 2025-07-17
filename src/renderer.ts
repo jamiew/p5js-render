@@ -84,8 +84,8 @@ export class P5Renderer {
         const htmlContent = this.createOptimizedSketchHTML(actualConfig);
         await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
 
-        // Wait for p5.js to load and sketch to start with shorter timeout
-        await page.waitForFunction('window.p5 && window.sketchReady', { timeout: 5000 });
+        // Wait for p5.js to load and sketch to start with longer timeout for complex sketches
+        await page.waitForFunction('window.p5 && window.sketchReady', { timeout: 30000 });
 
         const chunkFrames: FrameData[] = [];
 
@@ -102,9 +102,13 @@ export class P5Renderer {
           const screenshotOptions: PageScreenshotOptions = {
             type: options.format || 'png', // PNG for better quality
             clip: { x: 0, y: 0, width: actualConfig.width, height: actualConfig.height },
-            quality: options.quality || 100, // High quality for PNG
             animations: 'disabled' // Disable CSS animations
           };
+          
+          // Only set quality for JPEG format
+          if (options.format === 'jpeg' && options.quality) {
+            screenshotOptions.quality = options.quality;
+          }
           
           const screenshot = await page.screenshot(screenshotOptions);
 
