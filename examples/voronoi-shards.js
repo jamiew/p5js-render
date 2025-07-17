@@ -189,11 +189,11 @@ function drawKaleidoscope(time) {
   for (let segment of kaleidoscope) {
     let t = time + segment.phase;
     let rotation = segment.angle + sin(t) * 0.2;
-    let scale = 0.8 + sin(t * 2) * 0.1;
+    let scaleValue = 0.8 + sin(t * 2) * 0.1;
     
     push();
     rotate(rotation);
-    scale(scale);
+    scale(scaleValue);
     
     drawKaleidoscopeSegment(t, segment);
     

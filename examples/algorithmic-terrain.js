@@ -94,34 +94,34 @@ function drawMicroStrokes(time) {
   stroke(30, 20, 70, 15);
   strokeWeight(0.3);
   
-  for (let stroke of microStrokes) {
-    let elevation = getElevationAt(stroke.x, stroke.y);
+  for (let microStroke of microStrokes) {
+    let elevation = getElevationAt(microStroke.x, microStroke.y);
     let windDirection = atan2(
-      getElevationAt(stroke.x, stroke.y + 5) - getElevationAt(stroke.x, stroke.y - 5),
-      getElevationAt(stroke.x + 5, stroke.y) - getElevationAt(stroke.x - 5, stroke.y)
+      getElevationAt(microStroke.x, microStroke.y + 5) - getElevationAt(microStroke.x, microStroke.y - 5),
+      getElevationAt(microStroke.x + 5, microStroke.y) - getElevationAt(microStroke.x - 5, microStroke.y)
     );
     
-    let angle = windDirection + sin(time * 2 + stroke.phase) * 0.3;
+    let angle = windDirection + sin(time * 2 + microStroke.phase) * 0.3;
     
     let alpha = map(elevation, 0, 150, 5, 25);
     let hue = map(elevation, 0, 150, 35, 25);
     
     stroke(hue, 30, 65, alpha);
     
-    let x1 = stroke.x;
-    let y1 = stroke.y;
-    let x2 = x1 + cos(angle) * stroke.length;
-    let y2 = y1 + sin(angle) * stroke.length;
+    let x1 = microStroke.x;
+    let y1 = microStroke.y;
+    let x2 = x1 + cos(angle) * microStroke.length;
+    let y2 = y1 + sin(angle) * microStroke.length;
     
     line(x1, y1, x2, y2);
     
-    stroke.x += cos(windDirection) * stroke.speed * 10;
-    stroke.y += sin(windDirection) * stroke.speed * 10;
+    microStroke.x += cos(windDirection) * microStroke.speed * 10;
+    microStroke.y += sin(windDirection) * microStroke.speed * 10;
     
-    if (stroke.x < 0) stroke.x = width;
-    if (stroke.x > width) stroke.x = 0;
-    if (stroke.y < 0) stroke.y = height;
-    if (stroke.y > height) stroke.y = 0;
+    if (microStroke.x < 0) microStroke.x = width;
+    if (microStroke.x > width) microStroke.x = 0;
+    if (microStroke.y < 0) microStroke.y = height;
+    if (microStroke.y > height) microStroke.y = 0;
   }
 }
 
