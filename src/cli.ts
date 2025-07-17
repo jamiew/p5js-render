@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { execSync } from 'child_process';
 import path from 'path';
+import { RenderApiResponse, ApiFrameData } from './types.js';
 
 interface RenderConfig {
   sketchName?: string;
@@ -75,7 +76,7 @@ async function renderSketch(config: RenderConfig): Promise<void> {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const result = await response.json() as any;
+    const result = await response.json() as RenderApiResponse;
     console.log(`  ✅ Rendered ${result.totalFrames} frames in ${result.durationMs}ms`);
 
     // Create output directory
@@ -83,7 +84,7 @@ async function renderSketch(config: RenderConfig): Promise<void> {
 
     // Save all frames
     console.log(`  💾 Saving ${result.frames.length} frames to ${outputDir}/...`);
-    result.frames.forEach((frame: any) => {
+    result.frames.forEach((frame: ApiFrameData) => {
       const frameNumber = String(frame.frameNumber).padStart(4, '0');
       const filename = path.join(outputDir, `frame_${frameNumber}.png`);
       fs.writeFileSync(filename, Buffer.from(frame.data, 'base64'));
@@ -105,7 +106,7 @@ async function renderSketch(config: RenderConfig): Promise<void> {
         execSync('which open', { stdio: 'pipe' });
         execSync(`open "${videoFile}"`, { stdio: 'pipe' });
         console.log(`  📺 Opening video...`);
-      } catch (e) {
+      } catch {
         console.log(`  💡 Video ready: ${videoFile}`);
       }
     } catch (error) {
@@ -182,7 +183,7 @@ async function renderAllExamples(): Promise<void> {
     execSync('which open', { stdio: 'pipe' });
     execSync('open output/', { stdio: 'pipe' });
     console.log('📂 Opening output directory...');
-  } catch (e) {
+  } catch {
     console.log('💡 Check the output/ directory for all rendered videos');
   }
 }

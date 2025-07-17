@@ -1,4 +1,4 @@
-import { chromium, Browser, Page } from 'playwright';
+import { chromium, Browser, Page, PageScreenshotOptions } from 'playwright';
 import { SketchConfig, RenderOptions, FrameData, RenderResult } from './types.js';
 
 export class P5Renderer {
@@ -29,20 +29,20 @@ export class P5Renderer {
     for (let frameNumber = 0; frameNumber < totalFrames; frameNumber++) {
       // Set the frame number for deterministic rendering
       await this.page.evaluate((frame: number) => {
-        (globalThis as any).currentFrame = frame;
+        globalThis.currentFrame = frame;
       }, frameNumber);
 
       // Trigger a redraw
       await this.page.evaluate(() => {
-        if ((globalThis as any).redraw) {
-          (globalThis as any).redraw();
+        if (globalThis.redraw) {
+          globalThis.redraw();
         }
       });
 
       // Small delay to ensure frame is rendered
       await this.page.waitForTimeout(16); // ~60fps worth of wait
 
-      const screenshotOptions: any = {
+      const screenshotOptions: PageScreenshotOptions = {
         type: options.format || 'png',
         clip: { x: 0, y: 0, width: config.width, height: config.height }
       };
