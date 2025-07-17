@@ -28,9 +28,13 @@ fastify.post<{
   try {
     await renderer.initialize();
     
+    const renderOptions: { format?: 'png' | 'jpeg'; quality?: number } = {};
+    if (format) renderOptions.format = format;
+    if (quality) renderOptions.quality = quality;
+    
     const result = await renderer.renderSketch(
       { code, width, height, frameRate, durationSeconds },
-      { format, quality }
+      renderOptions
     );
 
     const framesData = result.frames.map(frame => ({

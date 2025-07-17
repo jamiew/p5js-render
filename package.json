@@ -9,6 +9,9 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest",
+    "test:simple": "node test-scripts/simple-test.js",
+    "test:cubes": "node test-scripts/cubes-test.js",
+    "test:all": "node test-scripts/all-examples.js",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
   },

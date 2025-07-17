@@ -10,4 +10,5 @@ coverage/
 temp/
 frames/
 videos/
+output/
 *.tsbuildinfo

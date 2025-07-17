@@ -20,7 +20,7 @@ export class P5Renderer {
     const startTime = Date.now();
 
     const htmlContent = this.createSketchHTML(config);
-    await this.page.setContent(htmlContent);
+    await this.page.setContent(htmlContent, { waitUntil: 'networkidle' });
     await this.page.setViewportSize({ width: config.width, height: config.height });
 
     // Wait for p5.js to load and sketch to start
@@ -28,25 +28,30 @@ export class P5Renderer {
 
     for (let frameNumber = 0; frameNumber < totalFrames; frameNumber++) {
       // Set the frame number for deterministic rendering
-      await this.page.evaluate((frame) => {
-        (window as any).currentFrame = frame;
+      await this.page.evaluate((frame: number) => {
+        (globalThis as any).currentFrame = frame;
       }, frameNumber);
 
       // Trigger a redraw
       await this.page.evaluate(() => {
-        if ((window as any).redraw) {
-          (window as any).redraw();
+        if ((globalThis as any).redraw) {
+          (globalThis as any).redraw();
         }
       });
 
       // Small delay to ensure frame is rendered
       await this.page.waitForTimeout(16); // ~60fps worth of wait
 
-      const screenshot = await this.page.screenshot({
+      const screenshotOptions: any = {
         type: options.format || 'png',
-        quality: options.quality,
         clip: { x: 0, y: 0, width: config.width, height: config.height }
-      });
+      };
+      
+      if (options.quality !== undefined) {
+        screenshotOptions.quality = options.quality;
+      }
+      
+      const screenshot = await this.page.screenshot(screenshotOptions);
 
       frames.push({
         frameNumber,
@@ -88,43 +93,39 @@ export class P5Renderer {
     window.currentFrame = 0;
     window.sketchReady = false;
     
-    // Override frameCount to use our custom frame counter
-    let originalDraw;
+    // User sketch code first
+    ${config.code}
     
-    function setup() {
+    // Override setup and draw if they exist
+    const userSetup = window.setup;
+    const userDraw = window.draw;
+    
+    window.setup = function() {
       createCanvas(${config.width}, ${config.height});
       frameRate(${config.frameRate});
       
-      // Execute user sketch setup
-      ${this.extractSetupFunction(config.code)}
+      // Call user setup if it exists
+      if (userSetup) {
+        userSetup();
+      }
       
       window.sketchReady = true;
-    }
+    };
     
-    function draw() {
+    window.draw = function() {
       // Use our controlled frame counter
       frameCount = window.currentFrame + 1;
       
-      // Execute user sketch draw
-      ${this.extractDrawFunction(config.code)}
-    }
-    
-    // User sketch code (functions will be extracted)
-    ${config.code}
+      // Call user draw if it exists
+      if (userDraw) {
+        userDraw();
+      }
+    };
   </script>
 </body>
 </html>`;
   }
 
-  private extractSetupFunction(code: string): string {
-    const setupMatch = code.match(/function\s+setup\s*\([^)]*\)\s*\{([\s\S]*?)\}/);
-    return setupMatch ? setupMatch[1] : '';
-  }
-
-  private extractDrawFunction(code: string): string {
-    const drawMatch = code.match(/function\s+draw\s*\([^)]*\)\s*\{([\s\S]*?)\}/);
-    return drawMatch ? drawMatch[1] : '';
-  }
 
   async cleanup(): Promise<void> {
     if (this.page) {
