@@ -7,11 +7,13 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
-    "start": "node dist/index.js",
+    "start": "tsx src/index.ts",
+    "start:prod": "node dist/index.js",
     "test": "vitest",
-    "test:simple": "node test-scripts/simple-test.js",
-    "test:cubes": "node test-scripts/cubes-test.js",
-    "test:all": "node test-scripts/all-examples.js",
+    "render": "tsx src/cli.ts",
+    "render:url": "tsx src/cli.ts url",
+    "render:code": "tsx src/cli.ts code",
+    "render:all": "tsx src/cli.ts all",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"
   },
