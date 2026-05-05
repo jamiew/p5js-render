@@ -1,404 +1,400 @@
-import fs from 'fs';
-import { execSync } from 'child_process';
+import { spawn } from 'child_process';
+import { mkdir, readdir, readFile, writeFile } from 'fs/promises';
 import path from 'path';
-import { RenderApiResponse, ApiFrameData } from './types.js';
+import { P5Renderer } from './renderer.js';
+import {
+  CAPTURE_METHODS,
+  CaptureMethod,
+  FrameData,
+  ImageFormat,
+  IMAGE_FORMATS,
+  RenderOptions,
+  SketchConfig
+} from './types.js';
 
 interface RenderConfig {
   sketchName?: string;
   sketchUrl?: string;
   sketchCode?: string;
-  width?: number;
-  height?: number;
-  frameRate?: number;
-  duration?: number;
-  serverUrl?: string;
-  silent?: boolean;
+  width: number;
+  height: number;
+  frameRate: number;
+  durationSeconds: number;
+  pixelDensity?: number;
+  backgroundColor?: string;
+  output?: string;
+  saveFrames?: boolean;
+  crf: number;
 }
 
-interface RenderResult {
+interface CliRenderResult {
   success: boolean;
   name: string;
   time: number;
-  output: string[];
-  error?: any;
+  outputPath?: string;
+  error?: unknown;
 }
 
 const DEFAULT_CONFIG = {
   width: 800,
   height: 600,
   frameRate: 24,
-  duration: 3,
-  serverUrl: 'http://localhost:3000'
+  durationSeconds: 3,
+  crf: 18
 };
 
 async function loadSketchCode(config: RenderConfig): Promise<string> {
   if (config.sketchCode) {
     return config.sketchCode;
   }
-  
+
   if (config.sketchUrl) {
-    console.log(`📥 Fetching sketch from URL: ${config.sketchUrl}`);
     const response = await fetch(config.sketchUrl);
     if (!response.ok) {
-      throw new Error(`Failed to fetch sketch: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch sketch: ${response.status} ${response.statusText}`
+      );
     }
     return await response.text();
   }
-  
+
   if (config.sketchName) {
-    const sketchPath = `./examples/${config.sketchName}.js`;
-    if (!fs.existsSync(sketchPath)) {
-      throw new Error(`Sketch file not found: ${sketchPath}`);
-    }
-    console.log(`📁 Loading sketch: ${sketchPath}`);
-    return fs.readFileSync(sketchPath, 'utf8');
+    return await readFile(
+      path.join('examples', `${config.sketchName}.js`),
+      'utf8'
+    );
   }
-  
-  throw new Error('Must provide sketchName, sketchUrl, or sketchCode');
+
+  throw new Error('Must provide sketchName, sketchUrl, or sketchCode.');
 }
 
-async function renderSketch(config: RenderConfig): Promise<RenderResult> {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+async function renderSketch(
+  config: RenderConfig,
+  options: RenderOptions
+): Promise<CliRenderResult> {
   const outputName = config.sketchName || 'custom-sketch';
-  const outputDir = `output/${outputName}`;
+  const outputPath = config.output ?? path.join('output', `${outputName}.mp4`);
+  const frameDir = path.join('output', outputName);
   const startTime = Date.now();
-  const output: string[] = [];
-  
-  const log = (message: string) => {
-    if (config.silent) {
-      output.push(message);
-    } else {
-      console.log(message);
-    }
-  };
-  
-  log(`🚀 Rendering ${outputName}...`);
-  
+
+  console.log(
+    `Rendering ${outputName} at ${config.width}x${config.height}, ${config.frameRate} fps.`
+  );
+
+  const renderer = new P5Renderer();
   try {
     const code = await loadSketchCode(config);
-    
-    const testData = {
+    const sketchConfig: SketchConfig = {
       code,
-      width: finalConfig.width,
-      height: finalConfig.height,
-      frameRate: finalConfig.frameRate,
-      durationSeconds: finalConfig.duration
+      width: config.width,
+      height: config.height,
+      frameRate: config.frameRate,
+      durationSeconds: config.durationSeconds
     };
+    if (config.pixelDensity !== undefined)
+      sketchConfig.pixelDensity = config.pixelDensity;
+    if (config.backgroundColor !== undefined)
+      sketchConfig.backgroundColor = config.backgroundColor;
 
-    const response = await fetch(`${finalConfig.serverUrl}/render`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(testData)
-    });
+    await renderer.initialize();
+    const result = await renderer.renderSketch(sketchConfig, options);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    if (config.saveFrames) {
+      await saveFrames(result.frames, frameDir, options.format ?? 'png');
+      console.log(`Saved ${result.frames.length} frames to ${frameDir}.`);
     }
 
-    const result = await response.json() as RenderApiResponse;
-    log(`  ✅ Rendered ${result.totalFrames} frames in ${result.durationMs}ms`);
-
-    // Create output directory
-    fs.mkdirSync(outputDir, { recursive: true });
-
-    // Save all frames
-    log(`  💾 Saving ${result.frames.length} frames to ${outputDir}/...`);
-    result.frames.forEach((frame: ApiFrameData) => {
-      const frameNumber = String(frame.frameNumber).padStart(4, '0');
-      const filename = path.join(outputDir, `frame_${frameNumber}.png`);
-      fs.writeFileSync(filename, Buffer.from(frame.data, 'base64'));
+    await mkdir(path.dirname(outputPath), { recursive: true });
+    await encodeFramesWithFfmpeg(result.frames, {
+      frameRate: config.frameRate,
+      outputPath,
+      crf: config.crf
     });
-
-    log(`  📁 Frames saved to ${outputDir}/`);
-
-    // Create video with FFmpeg - save in both locations
-    const videoFileInDir = `${outputDir}/${outputName}-animation.mp4`;
-    const videoFileInOutput = `output/${outputName}.mp4`;
-    const ffmpegCmd = `ffmpeg -y -r ${finalConfig.frameRate} -i "${outputDir}/frame_%04d.png" -c:v libx264 -pix_fmt yuv420p "${videoFileInDir}"`;
-    
-    log(`  🎬 Creating video...`);
-    try {
-      execSync(ffmpegCmd, { stdio: 'pipe' });
-      
-      // Copy video to main output directory for easy browsing
-      fs.copyFileSync(videoFileInDir, videoFileInOutput);
-      
-      log(`  ✅ Video created: ${videoFileInOutput}`);
-      log(`  📁 Also saved: ${videoFileInDir}`);
-      
-      // Try to open the video
-      if (!config.silent) {
-        try {
-          execSync('which open', { stdio: 'pipe' });
-          execSync(`open "${videoFileInOutput}"`, { stdio: 'pipe' });
-          log(`  📺 Opening video...`);
-        } catch {
-          log(`  💡 Video ready: ${videoFileInOutput}`);
-        }
-      } else {
-        log(`  💡 Video ready: ${videoFileInOutput}`);
-      }
-    } catch (error) {
-      log(`  ❌ FFmpeg error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      log(`  💡 Manual command: ${ffmpegCmd}`);
-    }
 
     const time = Date.now() - startTime;
-    return { success: true, name: outputName, time, output };
-
+    console.log(
+      `Rendered ${result.totalFrames} frames in ${formatTime(time)}.`
+    );
+    console.log(`Video written to ${outputPath}.`);
+    return { success: true, name: outputName, time, outputPath };
   } catch (error) {
     const time = Date.now() - startTime;
-    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-    log(`❌ Error rendering ${outputName}: ${errorMsg}`);
-    return { success: false, name: outputName, time, output, error };
+    console.error(
+      `Render failed for ${outputName}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return { success: false, name: outputName, time, error };
+  } finally {
+    await renderer.cleanup();
   }
 }
 
-// Loading animation utilities
-function createSpinner() {
-  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  let i = 0;
-  return {
-    frame: () => frames[i++ % frames.length],
-    dots: (elapsed: number) => '.'.repeat(Math.floor(elapsed / 1000) % 4)
-  };
+async function saveFrames(
+  frames: FrameData[],
+  outputDir: string,
+  extension: ImageFormat
+): Promise<void> {
+  await mkdir(outputDir, { recursive: true });
+  await Promise.all(
+    frames.map(async (frame) => {
+      const frameNumber = String(frame.frameNumber).padStart(6, '0');
+      const filename = path.join(
+        outputDir,
+        `frame_${frameNumber}.${extension === 'jpeg' ? 'jpg' : 'png'}`
+      );
+      await writeFile(filename, frame.buffer);
+    })
+  );
+}
+
+async function encodeFramesWithFfmpeg(
+  frames: FrameData[],
+  config: { frameRate: number; outputPath: string; crf: number }
+): Promise<void> {
+  const args = [
+    '-y',
+    '-f',
+    'image2pipe',
+    '-framerate',
+    String(config.frameRate),
+    '-i',
+    'pipe:0',
+    '-c:v',
+    'libx264',
+    '-crf',
+    String(config.crf),
+    '-pix_fmt',
+    'yuv420p',
+    config.outputPath
+  ];
+
+  const ffmpeg = spawn('ffmpeg', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+  const stderr: Buffer[] = [];
+
+  ffmpeg.stderr.on('data', (chunk: Buffer) => {
+    stderr.push(chunk);
+  });
+
+  const completion = new Promise<void>(
+    (resolveCompletion, rejectCompletion) => {
+      ffmpeg.on('error', rejectCompletion);
+      ffmpeg.on('close', (code) => {
+        if (code === 0) {
+          resolveCompletion();
+        } else {
+          rejectCompletion(
+            new Error(
+              Buffer.concat(stderr).toString('utf8') ||
+                `ffmpeg exited with code ${code}`
+            )
+          );
+        }
+      });
+    }
+  );
+
+  for (const frame of frames) {
+    if (!ffmpeg.stdin.write(frame.buffer)) {
+      await new Promise<void>((resolveDrain) =>
+        ffmpeg.stdin.once('drain', resolveDrain)
+      );
+    }
+  }
+  ffmpeg.stdin.end();
+
+  await completion;
+}
+
+async function renderAllExamples(options: RenderOptions): Promise<void> {
+  const files = (await readdir('examples'))
+    .filter((file) => file.endsWith('.js'))
+    .sort();
+  const results: CliRenderResult[] = [];
+  const startTime = Date.now();
+
+  for (const file of files) {
+    const sketchName = file.replace(/\.js$/, '');
+    results.push(
+      await renderSketch(
+        {
+          ...DEFAULT_CONFIG,
+          ...readConfigFromEnv(),
+          sketchName
+        },
+        options
+      )
+    );
+  }
+
+  const successful = results.filter((result) => result.success);
+  const failed = results.filter((result) => !result.success);
+  console.log(
+    `Finished ${successful.length}/${results.length} renders in ${formatTime(Date.now() - startTime)}.`
+  );
+
+  if (failed.length > 0) {
+    console.log(`Failed: ${failed.map((result) => result.name).join(', ')}`);
+    process.exitCode = 1;
+  }
+}
+
+function readConfigFromEnv(): Partial<RenderConfig> {
+  const config: Partial<RenderConfig> = {};
+  const width = readNumberEnv('WIDTH');
+  const height = readNumberEnv('HEIGHT');
+  const frameRate = readNumberEnv('FRAMERATE');
+  const durationSeconds = readNumberEnv('DURATION');
+  const pixelDensity = readNumberEnv('PIXEL_DENSITY');
+  const crf = readNumberEnv('CRF');
+
+  if (width !== undefined) config.width = width;
+  if (height !== undefined) config.height = height;
+  if (frameRate !== undefined) config.frameRate = frameRate;
+  if (durationSeconds !== undefined) config.durationSeconds = durationSeconds;
+  if (pixelDensity !== undefined) config.pixelDensity = pixelDensity;
+  if (crf !== undefined) config.crf = crf;
+
+  if (process.env.BACKGROUND_COLOR !== undefined)
+    config.backgroundColor = process.env.BACKGROUND_COLOR;
+  if (process.env.OUTPUT !== undefined) config.output = process.env.OUTPUT;
+  if (process.env.SAVE_FRAMES !== undefined) {
+    config.saveFrames =
+      process.env.SAVE_FRAMES === '1' || process.env.SAVE_FRAMES === 'true';
+  }
+
+  return config;
+}
+
+function readOptionsFromEnv(): RenderOptions {
+  const options: RenderOptions = {};
+  const format = readImageFormatEnv();
+  const captureMethod = readCaptureMethodEnv();
+  const quality = readNumberEnv('QUALITY');
+  const maxConcurrency = readNumberEnv('MAX_CONCURRENCY');
+  const timeoutMs = readNumberEnv('TIMEOUT_MS');
+
+  if (format !== undefined) options.format = format;
+  if (captureMethod !== undefined) options.captureMethod = captureMethod;
+  if (process.env.P5_VERSION !== undefined)
+    options.p5Version = process.env.P5_VERSION;
+  if (process.env.P5_SCRIPT_URL !== undefined)
+    options.p5ScriptUrl = process.env.P5_SCRIPT_URL;
+  if (process.env.P5_SCRIPT_PATH !== undefined)
+    options.p5ScriptPath = process.env.P5_SCRIPT_PATH;
+  if (quality !== undefined) options.quality = quality;
+  if (maxConcurrency !== undefined) options.maxConcurrency = maxConcurrency;
+  if (timeoutMs !== undefined) options.timeoutMs = timeoutMs;
+
+  return options;
+}
+
+function readNumberEnv(name: string): number | undefined {
+  const value = process.env[name];
+  if (value === undefined || value === '') {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${name} must be a number.`);
+  }
+  return parsed;
+}
+
+function readImageFormatEnv(): ImageFormat | undefined {
+  if (process.env.FORMAT === undefined) {
+    return undefined;
+  }
+  if (isImageFormat(process.env.FORMAT)) {
+    return process.env.FORMAT;
+  }
+  throw new Error('FORMAT must be png or jpeg.');
+}
+
+function readCaptureMethodEnv(): CaptureMethod | undefined {
+  if (process.env.CAPTURE_METHOD === undefined) {
+    return undefined;
+  }
+  if (isCaptureMethod(process.env.CAPTURE_METHOD)) {
+    return process.env.CAPTURE_METHOD;
+  }
+  throw new Error('CAPTURE_METHOD must be canvas or screenshot.');
+}
+
+function isImageFormat(value: string): value is ImageFormat {
+  return IMAGE_FORMATS.includes(value as ImageFormat);
+}
+
+function isCaptureMethod(value: string): value is CaptureMethod {
+  return CAPTURE_METHODS.includes(value as CaptureMethod);
 }
 
 function formatTime(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = (ms / 1000).toFixed(1);
-  return `${seconds}s`;
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 }
 
-// Live progress tracking for parallel rendering
-interface SketchProgress {
-  name: string;
-  status: 'waiting' | 'running' | 'completed' | 'failed';
-  startTime?: number;
-  endTime?: number;
-  spinner: ReturnType<typeof createSpinner>;
+function printUsage(): void {
+  console.log(`
+Usage:
+  npm run render <sketch-name>
+  npm run render:url <url>
+  npm run render:code "<p5js-code>"
+  npm run render:all
+
+Environment options:
+  WIDTH=1920 HEIGHT=1080 FRAMERATE=60 DURATION=5 npm run render rotating-cubes
+  P5_VERSION=1.11.13 npm run render simple-circle
+  P5_SCRIPT_PATH=./vendor/p5.min.js npm run render simple-circle
+  CAPTURE_METHOD=screenshot MAX_CONCURRENCY=2 SAVE_FRAMES=1 npm run render simple-circle
+  OUTPUT=output/custom.mp4 CRF=16 npm run render simple-circle
+`);
 }
 
-function displayProgressDashboard(sketches: SketchProgress[]) {
-  // Clear screen and reset cursor
-  process.stdout.write('\x1B[2J\x1B[0f');
-  
-  console.log('🎨 Rendering all example sketches in parallel...\n');
-  
-  sketches.forEach(sketch => {
-    let elapsed = 0;
-    let timeStr = '';
-    
-    if (sketch.status === 'completed' || sketch.status === 'failed') {
-      // Show final time for completed/failed sketches
-      elapsed = sketch.endTime! - sketch.startTime!;
-      timeStr = ` (${formatTime(elapsed)})`;
-    } else if (sketch.startTime) {
-      // Show running time for active sketches
-      elapsed = Date.now() - sketch.startTime;
-      timeStr = ` (${formatTime(elapsed)})`;
-    }
-    
-    const statusIcon = {
-      waiting: '⏳',
-      running: sketch.spinner.frame(),
-      completed: '✅',
-      failed: '❌'
-    }[sketch.status];
-    
-    const dots = sketch.status === 'running' ? sketch.spinner.dots(elapsed) : '';
-    
-    console.log(`  ${statusIcon} ${sketch.name.padEnd(20)} ${sketch.status}${dots}${timeStr}`);
-  });
-  
-  const running = sketches.filter(s => s.status === 'running').length;
-  const completed = sketches.filter(s => s.status === 'completed').length;
-  const failed = sketches.filter(s => s.status === 'failed').length;
-  
-  console.log(`\n📊 Progress: ${completed}✅ ${failed}❌ ${running}🔄 / ${sketches.length} total`);
-}
-
-async function renderAllExamples(): Promise<void> {
-  // Dynamically discover all sketches in examples directory
-  const examplesDir = './examples';
-  const files = fs.readdirSync(examplesDir).filter(file => file.endsWith('.js'));
-  
-  const examples = files.map(file => {
-    const name = file.replace('.js', '');
-    // Use sane defaults for all sketches
-    return { name, duration: 3, frameRate: 24 };
-  });
-
-  const overallStartTime = Date.now();
-  const completedResults: RenderResult[] = [];
-  
-  // Initialize progress tracking
-  const sketches: SketchProgress[] = examples.map(ex => ({
-    name: ex.name,
-    status: 'waiting' as const,
-    spinner: createSpinner()
-  }));
-  
-  // Start live progress display
-  const progressInterval = setInterval(() => {
-    displayProgressDashboard(sketches);
-  }, 200);
-  
-  // Create promises for all renders
-  const renderPromises = examples.map(async (example, index) => {
-    const sketch = sketches[index];
-    
-    // Update status to running
-    sketch.status = 'running';
-    sketch.startTime = Date.now();
-    
-    try {
-      const result = await renderSketch({
-        sketchName: example.name,
-        frameRate: example.frameRate,
-        duration: example.duration,
-        silent: true // Capture output for later display
-      });
-      
-      sketch.status = result.success ? 'completed' : 'failed';
-      sketch.endTime = Date.now();
-      
-      // Display completed sketch output immediately
-      console.log(`\n${'='.repeat(60)}`);
-      console.log(`📋 OUTPUT FOR: ${example.name.toUpperCase()}`);
-      console.log(`${'='.repeat(60)}`);
-      result.output.forEach(line => console.log(line));
-      console.log(`⏱️  Completed in ${formatTime(result.time)}\n`);
-      
-      completedResults.push(result);
-      return result;
-    } catch (error) {
-      sketch.status = 'failed';
-      sketch.endTime = Date.now();
-      
-      const result: RenderResult = {
-        success: false,
-        name: example.name,
-        time: Date.now() - sketch.startTime!,
-        output: [`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`],
-        error
-      };
-      
-      completedResults.push(result);
-      return result;
-    }
-  });
-  
-  // Wait for all renders to complete
-  await Promise.all(renderPromises);
-  
-  // Stop progress display
-  clearInterval(progressInterval);
-  
-  // Clear screen one final time and show summary
-  process.stdout.write('\x1B[2J\x1B[0f');
-  
-  const totalTime = Date.now() - overallStartTime;
-  const successful = completedResults.filter(r => r.success);
-  const failed = completedResults.filter(r => !r.success);
-  
-  console.log('🎯 PARALLEL RENDERING SUMMARY');
-  console.log('='.repeat(60));
-  console.log(`✅ Successful: ${successful.length}/${completedResults.length}`);
-  console.log(`❌ Failed: ${failed.length}/${completedResults.length}`);
-  console.log(`⏱️  Total time: ${formatTime(totalTime)} (parallel execution!)\n`);
-  
-  if (successful.length > 0) {
-    console.log('📊 Individual Render Times:');
-    successful.forEach(r => {
-      const example = examples.find(e => e.name === r.name)!;
-      const frames = example.frameRate * example.duration;
-      const frameTime = r.time / frames;
-      console.log(`  ✅ ${r.name.padEnd(20)} ${formatTime(r.time).padStart(8)} (${frameTime.toFixed(1)}ms/frame)`);
-    });
-    console.log('');
-    
-    console.log('📺 Created videos:');
-    successful.forEach(r => {
-      console.log(`  • output/${r.name}.mp4`);
-    });
-    console.log('');
-  }
-  
-  if (failed.length > 0) {
-    console.log('💥 Failed renders:');
-    failed.forEach(r => {
-      console.log(`  ❌ ${r.name.padEnd(20)} ${formatTime(r.time).padStart(8)}`);
-    });
-    console.log('');
-  }
-  
-  // Try to open output directory
-  try {
-    execSync('which open', { stdio: 'pipe' });
-    execSync('open output/', { stdio: 'pipe' });
-    console.log('📂 Opening output directory...');
-  } catch {
-    console.log('💡 Check the output/ directory for all rendered videos');
-  }
-}
-
-// CLI argument parsing
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
-  
   if (args.length === 0) {
-    console.log(`
-Usage:
-  npm run render <sketch-name>              # Render example sketch
-  npm run render:url <url>                  # Render sketch from URL
-  npm run render:code "<p5js-code>"         # Render inline code
-  npm run render:all                        # Render all examples
-
-Options can be set via environment variables:
-  WIDTH=1920 HEIGHT=1080 FRAMERATE=60 DURATION=5 npm run render rotating-cubes
-
-Examples:
-  npm run render rotating-cubes
-  npm run render:url https://gist.githubusercontent.com/user/123/raw/sketch.js
-  npm run render:code "function setup() { createCanvas(400,400); } function draw() { background(255,0,0); }"
-    `);
+    printUsage();
     return;
   }
 
   const command = args[0];
-  
+  const options = readOptionsFromEnv();
+
   if (command === 'all') {
-    await renderAllExamples();
+    await renderAllExamples(options);
     return;
   }
-  
-  const config: RenderConfig = {};
-  
-  if (process.env.WIDTH) config.width = Number(process.env.WIDTH);
-  if (process.env.HEIGHT) config.height = Number(process.env.HEIGHT);
-  if (process.env.FRAMERATE) config.frameRate = Number(process.env.FRAMERATE);
-  if (process.env.DURATION) config.duration = Number(process.env.DURATION);
-  if (process.env.SERVER_URL) config.serverUrl = process.env.SERVER_URL;
-  
+
+  const config: RenderConfig = {
+    ...DEFAULT_CONFIG,
+    ...readConfigFromEnv()
+  };
+
   if (command === 'url') {
+    if (!args[1]) {
+      throw new Error('render:url requires a URL argument.');
+    }
     config.sketchUrl = args[1];
     config.sketchName = 'url-sketch';
   } else if (command === 'code') {
+    if (!args[1]) {
+      throw new Error('render:code requires a p5.js code argument.');
+    }
     config.sketchCode = args[1];
     config.sketchName = 'inline-sketch';
   } else {
     config.sketchName = command;
   }
-  
-  const result = await renderSketch(config);
+
+  const result = await renderSketch(config, options);
   if (!result.success) {
     process.exit(1);
   }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(console.error);
+  main().catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
 }
 
-export { renderSketch, renderAllExamples };
+export { renderSketch, renderAllExamples, encodeFramesWithFfmpeg };

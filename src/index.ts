@@ -4,7 +4,7 @@ const start = async (): Promise<void> => {
   try {
     const port = Number(process.env.PORT) || 3000;
     const host = process.env.HOST || 'localhost';
-    
+
     await fastify.listen({ port, host });
     console.log(`Server running at http://${host}:${port}`);
   } catch (error) {
@@ -13,4 +13,4 @@ const start = async (): Promise<void> => {
   }
 };
 
-start();
+void start();
