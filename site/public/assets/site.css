@@ -1,0 +1,627 @@
+@font-face {
+  font-family: 'Wordmark';
+  src: url('fonts/jetbrains-mono-800-wordmark.woff2') format('woff2');
+  font-weight: 800;
+  font-display: swap;
+}
+
+:root {
+  --bg: #0b0c0f;
+  --panel: #14161b;
+  --line: #262a33;
+  --text: #e9e6df;
+  --soft: #cfccc4;
+  --muted: #9a9da6;
+  --accent: #7cffb2;
+  --coral: #e4512f;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --sprocket: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='14'%3E%3Crect x='8' y='2' width='12' height='10' rx='2.5' fill='%230b0c0f'/%3E%3C/svg%3E");
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px/1.6 system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+code,
+pre {
+  font-family: var(--mono);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  left: 16px;
+  top: -60px;
+  z-index: 10;
+  background: var(--accent);
+  color: var(--bg);
+  font: 700 14px var(--mono);
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.skip-link:focus {
+  top: 16px;
+}
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* Masthead with the scrolling film reel. */
+
+.masthead {
+  position: relative;
+  overflow: hidden;
+  padding-bottom: 8px;
+}
+
+.masthead-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 36px;
+  position: relative;
+  z-index: 1;
+}
+
+.wordmark {
+  font:
+    800 clamp(44px, 8.5vw, 104px) / 1 'Wordmark',
+    var(--mono);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.wordmark span {
+  color: var(--accent);
+}
+
+nav ul {
+  display: flex;
+  gap: 20px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font: 600 14px var(--mono);
+}
+
+nav a {
+  color: var(--soft);
+  text-decoration: none;
+}
+
+nav a:hover {
+  color: var(--accent);
+}
+
+.reel {
+  --frame: clamp(120px, 16vw, 196px);
+  --gap: 16px;
+  position: relative;
+  /* Rotation lifts one end and drops the other by about tan(5deg) * 50vw. */
+  margin: calc(4.5vw + 24px) -10vw calc(4.5vw + 32px);
+  padding: 36px 0;
+  background: #17181c;
+  transform: rotate(-5deg);
+  box-shadow: 0 30px 60px rgb(0 0 0 / 45%);
+}
+
+.reel::before,
+.reel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background: var(--sprocket) repeat-x;
+}
+
+.reel::before {
+  top: 8px;
+}
+
+.reel::after {
+  bottom: 8px;
+}
+
+.reel-track {
+  display: flex;
+  width: max-content;
+  animation: reel-scroll 80s linear infinite;
+}
+
+.reel:hover .reel-track {
+  animation-play-state: paused;
+}
+
+.reel-frame {
+  position: relative;
+  flex: none;
+  width: var(--frame);
+  aspect-ratio: 1;
+  margin-right: var(--gap);
+  background: #000;
+}
+
+.reel-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.reel-frame::after {
+  content: attr(data-number);
+  position: absolute;
+  bottom: -14px;
+  left: 2px;
+  font: 600 9px/1 var(--mono);
+  letter-spacing: 0.1em;
+  color: #6f727b;
+}
+
+@keyframes reel-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.motion-off .reel-track {
+  animation-play-state: paused;
+}
+
+.intro {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.lede {
+  font-size: 20px;
+  color: var(--soft);
+  max-width: 36em;
+  margin: 0;
+}
+
+.buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.button {
+  font: 600 14px var(--mono);
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text);
+  text-decoration: none;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.button.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+/* Sections. */
+
+section.wrap {
+  padding-top: 40px;
+  padding-bottom: 40px;
+}
+
+main:focus {
+  outline: none;
+}
+
+h2 {
+  font: 600 14px var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+
+.section-note {
+  color: var(--muted);
+  font-size: 14px;
+  margin: -8px 0 24px;
+}
+
+pre {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0;
+}
+
+pre .c {
+  color: var(--muted);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.toolbar h2 {
+  margin: 0;
+}
+
+.toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--panel);
+}
+
+.toggle button {
+  font: 600 12px var(--mono);
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.toggle button[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* Gallery cards. */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 28px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  scroll-margin-top: 24px;
+}
+
+.stage {
+  position: relative;
+  aspect-ratio: 1;
+  background: #000;
+}
+
+.stage video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.scrub-preview {
+  position: absolute;
+  inset: 0;
+  background-image: var(--sprite);
+  background-size: calc(var(--sprite-columns) * 100%)
+    calc(var(--sprite-rows) * 100%);
+  pointer-events: none;
+}
+
+.spinner {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgb(255 255 255 / 25%);
+  border-top-color: var(--accent);
+  opacity: 0;
+  transition: opacity 0.2s;
+  animation: spin 0.8s linear infinite;
+  pointer-events: none;
+}
+
+.stage.is-loading .spinner {
+  opacity: 1;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.card-body {
+  padding: 16px 18px 18px;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.card h3 {
+  font: 700 18px var(--mono);
+  margin: 0;
+}
+
+.meta {
+  font: 12px var(--mono);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.blurb {
+  margin: 10px 0 6px;
+  color: var(--soft);
+  font-size: 15px;
+}
+
+.credit {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.film {
+  position: relative;
+  margin: 14px -18px 0;
+  padding: 16px 0;
+  background:
+    var(--sprocket) 0 1px / 14px 7px repeat-x,
+    var(--sprocket) 0 calc(100% - 1px) / 14px 7px repeat-x,
+    #050506;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.film:focus-visible {
+  outline-offset: -2px;
+  border-radius: 0;
+}
+
+.cells {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  padding: 0 3px;
+}
+
+.cell {
+  aspect-ratio: 1;
+  background-color: #1b1d22;
+  background-size: calc(var(--sprite-columns) * 100%)
+    calc(var(--sprite-rows) * 100%);
+}
+
+.card.sprite-ready .cell {
+  background-image: var(--sprite);
+}
+
+.card:not(.sprite-ready) .cell {
+  background-image: linear-gradient(
+    100deg,
+    #1b1d22 30%,
+    #2a2e37 50%,
+    #1b1d22 70%
+  );
+  background-size: 300% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+.playhead {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  pointer-events: none;
+}
+
+.film-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font: 11px var(--mono);
+  color: var(--muted);
+  margin: 8px 0 0;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.copy {
+  font: 12px var(--mono);
+  color: var(--muted);
+  background: #0f1115;
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: copy;
+}
+
+.copy:hover {
+  color: var(--text);
+}
+
+/* How it works, FAQ and remixes. */
+
+.how {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.how div {
+  border-top: 2px solid var(--accent);
+  padding-top: 12px;
+}
+
+.how h3 {
+  font: 700 15px var(--mono);
+  margin: 0 0 6px;
+}
+
+.how p {
+  margin: 0;
+  color: var(--soft);
+  font-size: 15px;
+}
+
+.faq {
+  display: grid;
+  gap: 10px;
+  max-width: 860px;
+}
+
+.faq details {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 18px;
+}
+
+.faq summary {
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.faq summary h3 {
+  display: inline;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.faq details p {
+  margin: 10px 0 2px;
+  color: var(--soft);
+}
+
+.remixes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+.remixes figure {
+  margin: 0;
+}
+
+.remixes img,
+.remixes video {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.remixes figcaption {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+footer {
+  padding: 40px 24px 60px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .lede {
+    font-size: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  html:not(.motion-on) .reel-track {
+    animation-play-state: paused;
+  }
+  .spinner,
+  .card:not(.sprite-ready) .cell {
+    animation: none;
+  }
+}

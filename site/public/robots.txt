@@ -1,0 +1,5 @@
+# Search engines and AI crawlers are welcome.
+User-agent: *
+Allow: /
+
+Sitemap: https://jamiew.github.io/p5js-render/sitemap.xml

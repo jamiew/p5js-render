@@ -1,10 +1,14 @@
-<p align="center"><img src="docs/media/hero.jpg" alt="p5js-render" width="100%"></p>
+<p align="center"><a href="https://jamiew.github.io/p5js-render/"><img src="docs/media/header.webp" alt="The p5js-render wordmark above a scrolling film reel of rendered example loops" width="720"></a></p>
 
 # p5js-render
 
 Render p5.js sketches to MP4, WebM or GIF in headless Chromium. Every frame is drawn once, in order, on a virtual clock with a seeded random generator, so the same sketch always makes the same video.
 
-**[See the gallery, debug views and film strips on the demo site.](https://jamiew.github.io/p5js-render/)**
+**[See the gallery, debug views and scrubbable film strips on the demo site.](https://jamiew.github.io/p5js-render/)**
+
+<p align="center"><img src="docs/media/site-demo.webp" alt="The demo site: switching the gallery to debug HUD videos, then dragging a film strip to scrub frame by frame" width="640"></p>
+
+On the site, each example has a film strip you can drag or step through with the arrow keys. A sprite sheet of thumbnails gives instant previews while you scrub, then the video jumps to the exact frame. The Debug HUD toggle swaps every video for its `--debug` render.
 
 ## Gallery
 
@@ -152,7 +156,7 @@ try {
 pnpm check        # typecheck, lint, format check and tests
 RUN_BROWSER_TESTS=1 pnpm test --run   # include the Chromium integration tests
 pnpm media        # rebuild the README previews in docs/media (needs img2webp)
-pnpm site         # render the demo site into site/dist
+pnpm site         # render the demo site into site/dist (needs cwebp)
 ```
 
 CI runs `pnpm check` with the browser tests on Node 22 and 24. The `Demo site` workflow renders the showcase examples and publishes `site/dist` to GitHub Pages.
@@ -164,8 +168,8 @@ Promo art and remixes made with [Glif](https://glif.app), using real frames and 
 <p align="center"><img src="docs/media/remix-stopmotion.webp" width="600" alt="Cube Wave remade as a stop-motion animation of wooden blocks"></p>
 
 <p align="center">
-  <img src="docs/media/remix-riso.jpg" width="300" alt="Risograph-style print of the cube wave and pulsar ridges">
-  <img src="docs/media/remix-swiss.jpg" width="300" alt="Swiss-style FRAME BY FRAME poster with the dot lattice and Truchet ribbons">
+  <img src="docs/media/remix-riso.webp" width="300" alt="Risograph-style print of the cube wave and pulsar ridges">
+  <img src="docs/media/remix-swiss.webp" width="300" alt="Swiss-style FRAME BY FRAME poster with the dot lattice and Truchet ribbons">
 </p>
 
 ## Alternatives

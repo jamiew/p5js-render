@@ -16,43 +16,47 @@ export interface EncodeOptions {
 // yuv420p needs even dimensions, so odd-sized canvases get one padded pixel.
 const EVEN_PAD = 'pad=ceil(iw/2)*2:ceil(ih/2)*2';
 
-const OUTPUT_ARGS: Record<VideoFormat, (crf: number | undefined) => string[]> =
-  {
-    mp4: (crf) => [
-      '-c:v',
-      'libx264',
-      '-crf',
-      String(crf ?? 18),
-      '-preset',
-      'slow',
-      '-pix_fmt',
-      'yuv420p',
-      '-vf',
-      EVEN_PAD,
-      '-movflags',
-      '+faststart'
-    ],
-    webm: (crf) => [
-      '-c:v',
-      'libvpx-vp9',
-      '-crf',
-      String(crf ?? 30),
-      '-b:v',
-      '0',
-      '-row-mt',
-      '1',
-      '-pix_fmt',
-      'yuv420p',
-      '-vf',
-      EVEN_PAD
-    ],
-    gif: () => [
-      '-filter_complex',
-      'split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a',
-      '-loop',
-      '0'
-    ]
-  };
+// A keyframe every second keeps seeking (and scrubbing on the demo site) fast.
+const OUTPUT_ARGS: Record<VideoFormat, (options: EncodeOptions) => string[]> = {
+  mp4: ({ crf, frameRate }) => [
+    '-c:v',
+    'libx264',
+    '-crf',
+    String(crf ?? 18),
+    '-preset',
+    'slow',
+    '-g',
+    String(Math.round(frameRate)),
+    '-pix_fmt',
+    'yuv420p',
+    '-vf',
+    EVEN_PAD,
+    '-movflags',
+    '+faststart'
+  ],
+  webm: ({ crf, frameRate }) => [
+    '-c:v',
+    'libvpx-vp9',
+    '-crf',
+    String(crf ?? 30),
+    '-b:v',
+    '0',
+    '-g',
+    String(Math.round(frameRate)),
+    '-row-mt',
+    '1',
+    '-pix_fmt',
+    'yuv420p',
+    '-vf',
+    EVEN_PAD
+  ],
+  gif: () => [
+    '-filter_complex',
+    'split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=sierra2_4a',
+    '-loop',
+    '0'
+  ]
+};
 
 export function videoFormatFor(outputPath: string): VideoFormat {
   const extension = extname(outputPath).slice(1).toLowerCase();
@@ -86,7 +90,7 @@ export async function encodeVideo(
       String(options.frameRate),
       '-i',
       'pipe:0',
-      ...OUTPUT_ARGS[format](options.crf),
+      ...OUTPUT_ARGS[format](options),
       options.outputPath
     ],
     { stdio: ['pipe', 'ignore', 'pipe'] }

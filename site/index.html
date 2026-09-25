@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>p5js-render: render p5.js sketches to MP4, WebM or GIF</title>
+    <meta
+      name="description"
+      content="Render p5.js sketches to MP4, WebM or GIF in headless Chromium. Seeded randomness, a virtual clock and in-order frames make every render repeatable. CLI, Node API and HTTP API."
+    />
+    <link rel="canonical" href="https://jamiew.github.io/p5js-render/" />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-video-preview:-1"
+    />
+    <meta name="author" content="jamiew" />
+    <meta
+      name="keywords"
+      content="p5.js, render p5.js to video, p5.js to mp4, p5.js to gif, generative art, creative coding, headless chromium, playwright, ffmpeg"
+    />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0c0f" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="p5js-render" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:url" content="https://jamiew.github.io/p5js-render/" />
+    <meta
+      property="og:title"
+      content="p5js-render: p5.js sketches to video, frame by frame"
+    />
+    <meta
+      property="og:description"
+      content="Render p5.js sketches to MP4, WebM or GIF. Seeded, frame-exact and offline."
+    />
+    <meta
+      property="og:image"
+      content="https://jamiew.github.io/p5js-render/assets/og.jpg"
+    />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="The p5js-render wordmark over a film strip of generative artworks"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="p5js-render: p5.js sketches to video, frame by frame"
+    />
+    <meta
+      name="twitter:description"
+      content="Render p5.js sketches to MP4, WebM or GIF. Seeded, frame-exact and offline."
+    />
+    <meta
+      name="twitter:image"
+      content="https://jamiew.github.io/p5js-render/assets/og.jpg"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="The p5js-render wordmark over a film strip of generative artworks"
+    />
+
+    <link rel="icon" href="favicon.ico" sizes="32x32" />
+    <link
+      rel="icon"
+      href="assets/icon-192.png"
+      type="image/png"
+      sizes="192x192"
+    />
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link
+      rel="alternate"
+      type="text/plain"
+      href="llms.txt"
+      title="LLM-friendly summary"
+    />
+    <link rel="sitemap" type="application/xml" href="sitemap.xml" />
+    <link
+      rel="preload"
+      href="assets/fonts/jetbrains-mono-800-wordmark.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="assets/site.css" />
+    <!-- @jsonld -->
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="masthead">
+      <div class="wrap masthead-top">
+        <h1 class="wordmark">p5js<span>-render</span></h1>
+        <nav aria-label="Primary">
+          <ul>
+            <li><a href="#gallery">Gallery</a></li>
+            <li><a href="#how">How it works</a></li>
+            <li><a href="#faq">FAQ</a></li>
+            <li><a href="https://github.com/jamiew/p5js-render">GitHub</a></li>
+          </ul>
+        </nav>
+      </div>
+
+      <div class="reel" aria-hidden="true">
+        <div class="reel-track">
+          <!-- @reel -->
+        </div>
+      </div>
+
+      <div class="wrap intro">
+        <p class="lede">
+          Render p5.js sketches to MP4, WebM or GIF in headless Chromium. Every
+          frame is drawn once, in order, on a virtual clock with a seeded random
+          generator, so the same sketch always makes the same video.
+        </p>
+        <div class="buttons">
+          <a class="button primary" href="https://github.com/jamiew/p5js-render"
+            >View on GitHub</a
+          >
+          <button
+            type="button"
+            class="button motion-toggle"
+            aria-pressed="false"
+          >
+            Pause motion
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section class="wrap" aria-labelledby="start-title">
+        <h2 id="start-title">Quick start</h2>
+        <pre
+          tabindex="0"
+          role="region"
+          aria-label="Install and render commands"
+        ><code><span class="c"># install, then fetch the browser once</span>
+pnpm install &amp;&amp; pnpm exec playwright install chromium
+
+<span class="c"># render an example, with the debug HUD burned in</span>
+pnpm render cube-wave --debug
+
+<span class="c"># render your own sketch to a looping GIF</span>
+pnpm render ./sketch.js -o sketch.gif --duration 4</code></pre>
+      </section>
+
+      <section class="wrap" id="gallery" aria-labelledby="gallery-title">
+        <div class="toolbar">
+          <h2 id="gallery-title">Gallery</h2>
+          <div class="toggle" role="group" aria-label="Video mode">
+            <button type="button" data-mode="clean" aria-pressed="true">
+              Clean
+            </button>
+            <button type="button" data-mode="debug" aria-pressed="false">
+              Debug HUD
+            </button>
+          </div>
+        </div>
+        <p class="section-note">
+          Every video was rendered by GitHub Actions from the sketches in
+          <a href="https://github.com/jamiew/p5js-render/tree/main/examples"
+            >examples/</a
+          >. Drag a film strip to scrub frame by frame.
+        </p>
+        <div class="grid">
+          <!-- @gallery -->
+        </div>
+      </section>
+
+      <section class="wrap" id="how" aria-labelledby="how-title">
+        <h2 id="how-title">How it works</h2>
+        <div class="how">
+          <div>
+            <h3>Seeded randomness</h3>
+            <p>
+              Math.random is replaced with a seeded generator, so p5's random()
+              and noise() repeat for the same seed.
+            </p>
+          </div>
+          <div>
+            <h3>Virtual clock</h3>
+            <p>
+              performance.now, Date and millis() report the frame's time, not
+              the wall clock. Slow frames never drift.
+            </p>
+          </div>
+          <div>
+            <h3>Every frame, in order</h3>
+            <p>
+              Frames are drawn one after another on one page, so trails,
+              particles and simulations stay correct.
+            </p>
+          </div>
+          <div>
+            <h3>Off-thread encoding</h3>
+            <p>
+              A worker pool compresses frames while the next ones draw, then
+              streams them straight into ffmpeg.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap" id="faq" aria-labelledby="faq-title">
+        <h2 id="faq-title">Questions</h2>
+        <div class="faq">
+          <!-- @faq -->
+        </div>
+      </section>
+
+      <section class="wrap" id="remixes" aria-labelledby="remixes-title">
+        <h2 id="remixes-title">Remixes</h2>
+        <div class="remixes">
+          <figure>
+            <video
+              class="remix-video"
+              muted
+              loop
+              playsinline
+              preload="none"
+              width="960"
+              height="540"
+              poster="assets/remix-stopmotion.webp"
+              aria-label="The cube wave remade as a stop-motion animation of painted wooden blocks"
+            >
+              <source src="assets/remix-stopmotion.mp4" type="video/mp4" />
+            </video>
+            <figcaption>
+              Cube wave remade as stop-motion wooden blocks, following the
+              rendered loop's motion.
+            </figcaption>
+          </figure>
+          <figure>
+            <img
+              src="assets/remix-riso.webp"
+              width="600"
+              height="800"
+              loading="lazy"
+              decoding="async"
+              alt="A two-color risograph-style print of the cube wave under the pulsar ridgelines, in coral and navy on cream paper"
+            />
+            <figcaption>
+              Cube wave and pulsar ridges as a two-color risograph print.
+            </figcaption>
+          </figure>
+          <figure>
+            <img
+              src="assets/remix-swiss.webp"
+              width="600"
+              height="800"
+              loading="lazy"
+              decoding="async"
+              alt="A Swiss-style poster reading FRAME BY FRAME with the dot lattice and Truchet ribbons"
+            />
+            <figcaption>
+              Dot lattice and Truchet weave as a Swiss exhibition poster.
+            </figcaption>
+          </figure>
+        </div>
+        <p class="section-note">
+          Made with <a href="https://glif.app">Glif</a> from real frames
+          rendered by this tool.
+        </p>
+      </section>
+    </main>
+
+    <footer class="wrap">
+      <p>
+        p5js-render is MIT licensed. Made with p5.js, Playwright and ffmpeg.
+        Read the
+        <a href="https://github.com/jamiew/p5js-render#readme">README</a> or the
+        <a href="llms.txt">plain-text summary</a>.
+      </p>
+    </footer>
+
+    <p class="visually-hidden" role="status" aria-live="polite" id="status"></p>
+    <script type="module" src="assets/site.js"></script>
+  </body>
+</html>

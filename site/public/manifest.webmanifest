@@ -1,0 +1,14 @@
+{
+  "name": "p5js-render",
+  "short_name": "p5js-render",
+  "description": "Render p5.js sketches to MP4, WebM or GIF, frame by frame.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "browser",
+  "background_color": "#0b0c0f",
+  "theme_color": "#0b0c0f",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
