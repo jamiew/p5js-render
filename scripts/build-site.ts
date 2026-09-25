@@ -15,7 +15,7 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const OUT = path.join(ROOT, 'site', 'dist');
 const MEDIA = path.join(OUT, 'media');
 const STRIP_FRAMES = 10;
-const REPO_URL = 'https://github.com/jamiew/p5js-renderer';
+const REPO_URL = 'https://github.com/jamiew/p5js-render';
 
 /** One entry of site/dist/showcase.json, read by site/public/index.html. */
 interface SiteItem extends ShowcaseItem {

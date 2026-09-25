@@ -4,7 +4,7 @@
 
 Render p5.js sketches to MP4, WebM or GIF in headless Chromium. Every frame is drawn once, in order, on a virtual clock with a seeded random generator, so the same sketch always makes the same video.
 
-**[See the gallery, debug views and film strips on the demo site.](https://jamiew.github.io/p5js-renderer/)**
+**[See the gallery, debug views and film strips on the demo site.](https://jamiew.github.io/p5js-render/)**
 
 ## Gallery
 

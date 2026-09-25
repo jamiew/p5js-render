@@ -41,7 +41,7 @@
     "headless",
     "typescript"
   ],
-  "repository": "github:jamiew/p5js-renderer",
+  "repository": "github:jamiew/p5js-render",
   "license": "MIT",
   "dependencies": {
     "@fastify/cors": "^11.3.0",
