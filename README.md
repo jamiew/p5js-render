@@ -1,4 +1,4 @@
-<p align="center"><a href="https://jamiew.github.io/p5js-render/"><img src="docs/media/header.webp" alt="The p5js-render wordmark above a scrolling film reel of rendered example loops" width="720"></a></p>
+<p align="center"><a href="https://jamiew.github.io/p5js-render/"><img src="docs/media/header.webp" alt="A scrolling film reel of rendered example loops" width="100%"></a></p>
 
 # p5js-render
 
