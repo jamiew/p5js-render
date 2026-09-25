@@ -1,6 +1,6 @@
-// Renders the README previews in docs/media: an animated WebP per showcase
-// example, one debug-HUD preview and one film strip. Needs ffmpeg and img2webp
-// (brew install webp, or apt install webp). Run with `pnpm media`.
+// Renders the README gallery previews in docs/media: one animated WebP per
+// showcase example. Needs ffmpeg and img2webp (brew install webp, or apt
+// install webp). Run with `pnpm media`.
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readdir, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,7 +8,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { encodeVideo } from '../src/encode.ts';
 import { P5Renderer } from '../src/renderer.ts';
-import type { RenderOptions, SketchConfig } from '../src/types.ts';
+import type { SketchConfig } from '../src/types.ts';
 import { FRAME_RATE, SHOWCASE, type ShowcaseItem } from './showcase.ts';
 
 const run = promisify(execFile);
@@ -16,15 +16,12 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const OUT = path.join(ROOT, 'docs', 'media');
 const PREVIEW_SIZE = 320;
 const PREVIEW_FPS = 20;
-const DEBUG_EXAMPLE = 'cube-wave';
-const STRIP_EXAMPLE = 'flow-fibers';
 const only = process.argv.slice(2);
 
 async function renderVideo(
   renderer: P5Renderer,
   item: ShowcaseItem,
-  outputPath: string,
-  options: RenderOptions = {}
+  outputPath: string
 ): Promise<void> {
   const config: SketchConfig = {
     code: await readFile(
@@ -37,7 +34,7 @@ async function renderVideo(
     durationSeconds: item.durationSeconds,
     assetDir: path.join(ROOT, 'examples')
   };
-  await encodeVideo(renderer.streamFrames(config, options), {
+  await encodeVideo(renderer.streamFrames(config), {
     outputPath,
     frameRate: FRAME_RATE,
     crf: 12
@@ -96,34 +93,6 @@ try {
       const video = path.join(scratch, `${item.name}.mp4`);
       await renderVideo(renderer, item, video);
       await toWebp(video, path.join(OUT, `${item.name}.webp`), scratch);
-
-      if (item.name === DEBUG_EXAMPLE) {
-        const debugVideo = path.join(scratch, `${item.name}-debug.mp4`);
-        await renderVideo(renderer, item, debugVideo, { debug: true });
-        await toWebp(
-          debugVideo,
-          path.join(OUT, `${item.name}-debug.webp`),
-          scratch
-        );
-      }
-
-      if (item.name === STRIP_EXAMPLE) {
-        const step = Math.floor((item.durationSeconds * FRAME_RATE) / 6);
-        await run('ffmpeg', [
-          '-loglevel',
-          'error',
-          '-y',
-          '-i',
-          video,
-          '-vf',
-          `select='not(mod(n+1\\,${step}))',scale=200:-1:flags=lanczos,tile=6x1:padding=4:color=0x0b0c0f`,
-          '-frames:v',
-          '1',
-          '-q:v',
-          '3',
-          path.join(OUT, `${item.name}-strip.jpg`)
-        ]);
-      }
     })
   );
 } finally {

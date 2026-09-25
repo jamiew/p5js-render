@@ -16,7 +16,7 @@ const announce = (message) => {
 // Light, dark or system theme. The inline script in <head> applies a saved
 // choice before paint; this keeps the buttons and browser chrome in sync.
 const themeButtons = [...document.querySelectorAll('[data-theme-choice]')];
-const themeColors = { light: '#f4f1ea', dark: '#0b0c0f' };
+const themeColors = { light: '#ffffff', dark: '#0a0a0a' };
 const themeMetas = [...document.querySelectorAll('meta[name="theme-color"]')];
 
 const applyTheme = (choice) => {
