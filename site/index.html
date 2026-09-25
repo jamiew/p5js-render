@@ -173,98 +173,75 @@ pnpm render ./sketch.js -o sketch.gif --duration 4</code></pre>
 
       <section class="wrap" id="how" aria-labelledby="how-title">
         <h2 id="how-title">How it works</h2>
-        <div class="how">
-          <div>
-            <h3>Seeded randomness</h3>
-            <p>
-              Math.random is replaced with a seeded generator, so p5's random()
-              and noise() repeat for the same seed.
-            </p>
-          </div>
-          <div>
-            <h3>Virtual clock</h3>
-            <p>
-              performance.now, Date and millis() report the frame's time, not
-              the wall clock. Slow frames never drift.
-            </p>
-          </div>
-          <div>
-            <h3>Every frame, in order</h3>
-            <p>
-              Frames are drawn one after another on one page, so trails,
-              particles and simulations stay correct.
-            </p>
-          </div>
-          <div>
-            <h3>Off-thread encoding</h3>
-            <p>
-              A worker pool compresses frames while the next ones draw, then
-              streams them straight into ffmpeg.
-            </p>
-          </div>
-        </div>
+        <ol class="pipeline">
+          <li>
+            <svg class="icon" viewBox="0 0 48 48" aria-hidden="true">
+              <path d="M18 14 8 24l10 10M30 14l10 10-10 10" />
+            </svg>
+            <h3>Your sketch</h3>
+            <ul class="chips">
+              <li><code>sketch.js</code></li>
+              <li>+ assets</li>
+            </ul>
+          </li>
+          <li>
+            <svg class="icon" viewBox="0 0 48 48" aria-hidden="true">
+              <rect x="6" y="9" width="36" height="30" rx="4" />
+              <path d="M6 17h36" />
+              <path d="M31 27a7 7 0 1 1-2-5m2-4v4.5h-4.5" />
+            </svg>
+            <h3>Headless Chromium</h3>
+            <ul class="chips">
+              <li>seeded <code>random()</code></li>
+              <li>virtual clock</li>
+              <li>frames 1, 2, 3… in order</li>
+            </ul>
+          </li>
+          <li>
+            <svg class="icon" viewBox="0 0 48 48" aria-hidden="true">
+              <rect x="14" y="6" width="24" height="24" rx="3" />
+              <rect x="10" y="12" width="24" height="24" rx="3" />
+              <rect x="6" y="18" width="24" height="24" rx="3" />
+            </svg>
+            <h3>Encoder workers</h3>
+            <ul class="chips">
+              <li>PNG, in parallel</li>
+              <li>next frame keeps drawing</li>
+            </ul>
+          </li>
+          <li>
+            <svg class="icon" viewBox="0 0 48 48" aria-hidden="true">
+              <rect x="6" y="8" width="36" height="32" rx="3" />
+              <path
+                d="M13 8v32M35 8v32M6 16h7M6 24h7M6 32h7M35 16h7M35 24h7M35 32h7"
+              />
+              <path d="m21 18 8 6-8 6z" />
+            </svg>
+            <h3>ffmpeg</h3>
+            <ul class="chips">
+              <li>MP4</li>
+              <li>WebM</li>
+              <li>GIF</li>
+            </ul>
+          </li>
+        </ol>
       </section>
 
-      <section class="wrap" id="faq" aria-labelledby="faq-title">
-        <h2 id="faq-title">Questions</h2>
+      <section class="wrap faq-section" id="faq" aria-labelledby="faq-title">
+        <div class="faq-intro">
+          <h2 id="faq-title">Questions</h2>
+          <p>
+            Still stuck? Read the
+            <a href="https://github.com/jamiew/p5js-render#readme">README</a>
+            or
+            <a href="https://github.com/jamiew/p5js-render/issues"
+              >open an issue</a
+            >.
+          </p>
+        </div>
         <div class="faq">
           <!-- @faq -->
         </div>
-      </section>
-
-      <section class="wrap" id="remixes" aria-labelledby="remixes-title">
-        <h2 id="remixes-title">Remixes</h2>
-        <div class="remixes">
-          <figure>
-            <video
-              class="remix-video"
-              muted
-              loop
-              playsinline
-              preload="none"
-              width="960"
-              height="540"
-              poster="assets/remix-stopmotion.webp"
-              aria-label="The cube wave remade as a stop-motion animation of painted wooden blocks"
-            >
-              <source src="assets/remix-stopmotion.mp4" type="video/mp4" />
-            </video>
-            <figcaption>
-              Cube wave remade as stop-motion wooden blocks, following the
-              rendered loop's motion.
-            </figcaption>
-          </figure>
-          <figure>
-            <img
-              src="assets/remix-riso.webp"
-              width="600"
-              height="800"
-              loading="lazy"
-              decoding="async"
-              alt="A two-color risograph-style print of the cube wave under the pulsar ridgelines, in coral and navy on cream paper"
-            />
-            <figcaption>
-              Cube wave and pulsar ridges as a two-color risograph print.
-            </figcaption>
-          </figure>
-          <figure>
-            <img
-              src="assets/remix-swiss.webp"
-              width="600"
-              height="800"
-              loading="lazy"
-              decoding="async"
-              alt="A Swiss-style poster reading FRAME BY FRAME with the dot lattice and Truchet ribbons"
-            />
-            <figcaption>
-              Dot lattice and Truchet weave as a Swiss exhibition poster.
-            </figcaption>
-          </figure>
-        </div>
-        <p class="section-note">
-          Made with <a href="https://glif.app">Glif</a> from real frames
-          rendered by this tool.
-        </p>
       </section>
     </main>
 

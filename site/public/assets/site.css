@@ -520,83 +520,220 @@ pre .c {
   color: var(--text);
 }
 
-/* How it works, FAQ and remixes. */
+/* How it works: a four-step pipeline that stacks on narrow screens. */
 
-.how {
+.pipeline {
+  --arrow: 40px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
-}
-
-.how div {
-  border-top: 2px solid var(--accent);
-  padding-top: 12px;
-}
-
-.how h3 {
-  font: 700 15px var(--mono);
-  margin: 0 0 6px;
-}
-
-.how p {
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--arrow);
+  list-style: none;
   margin: 0;
-  color: var(--soft);
-  font-size: 15px;
+  padding: 0;
+  counter-reset: step;
 }
 
-.faq {
-  display: grid;
-  gap: 10px;
-  max-width: 860px;
-}
-
-.faq details {
+.pipeline > li {
+  position: relative;
+  counter-increment: step;
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 14px 18px;
+  border-radius: 14px;
+  padding: 18px 18px 20px;
 }
 
-.faq summary {
-  cursor: pointer;
-  list-style-position: outside;
+.pipeline > li::before {
+  content: counter(step, decimal-leading-zero);
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  font: 600 11px var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--muted);
 }
 
-.faq summary h3 {
-  display: inline;
-  font-size: 16px;
-  font-weight: 600;
+/* Arrow drawn in the gap after each step; it turns downward when stacked. */
+.pipeline > li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  width: var(--arrow);
+  height: 14px;
+  margin-top: -7px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 14'%3E%3Cpath d='M5 7h26' stroke='%237cffb2' stroke-width='2' stroke-dasharray='4 3' stroke-linecap='round'/%3E%3Cpath d='M28 2l7 5-7 5' fill='none' stroke='%237cffb2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
 }
 
-.faq details p {
-  margin: 10px 0 2px;
+.pipeline .icon {
+  width: 40px;
+  height: 40px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pipeline h3 {
+  font: 700 16px var(--mono);
+  margin: 12px 0 10px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chips li {
+  font: 12px/1.4 var(--mono);
   color: var(--soft);
+  background: #0f1115;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
 }
 
-.remixes {
+.chips code {
+  color: var(--accent);
+}
+
+@media (max-width: 900px) {
+  .pipeline {
+    grid-template-columns: 1fr;
+    max-width: 520px;
+    --arrow: 32px;
+  }
+  .pipeline > li:not(:last-child)::after {
+    top: 100%;
+    left: 50%;
+    width: var(--arrow);
+    height: 14px;
+    margin: calc(var(--arrow) / 2 - 7px) 0 0 calc(var(--arrow) / -2);
+    transform: rotate(90deg);
+  }
+}
+
+/* FAQ: an intro column beside a divided accordion. */
+
+.faq-section {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 24px;
+  grid-template-columns: minmax(200px, 1fr) 2.4fr;
+  gap: 24px 56px;
   align-items: start;
 }
 
-.remixes figure {
+.faq-intro p {
+  color: var(--muted);
+  font-size: 15px;
   margin: 0;
 }
 
-.remixes img,
-.remixes video {
-  width: 100%;
-  height: auto;
-  display: block;
-  border-radius: 12px;
-  border: 1px solid var(--line);
+.faq {
+  border-top: 1px solid var(--line);
 }
 
-.remixes figcaption {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 8px;
+.faq details {
+  border-bottom: 1px solid var(--line);
+}
+
+.faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 4px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq summary h3 {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0;
+  transition: color 0.15s;
+}
+
+.faq summary:hover h3,
+.faq details[open] summary h3 {
+  color: var(--accent);
+}
+
+.faq-icon {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  transition:
+    transform 0.2s,
+    border-color 0.15s;
+}
+
+.faq-icon::before,
+.faq-icon::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 2px;
+  margin: -1px 0 0 -5px;
+  background: var(--text);
+  border-radius: 1px;
+}
+
+.faq-icon::after {
+  transform: rotate(90deg);
+}
+
+.faq summary:hover .faq-icon {
+  border-color: var(--accent);
+}
+
+.faq details[open] .faq-icon {
+  transform: rotate(45deg);
+  border-color: var(--accent);
+}
+
+.faq details p {
+  margin: 0;
+  padding: 0 52px 22px 4px;
+  color: var(--soft);
+  max-width: 62ch;
+}
+
+/* Smoothly open answers where the browser supports animating to auto height. */
+@supports (interpolate-size: allow-keywords) {
+  .faq {
+    interpolate-size: allow-keywords;
+  }
+  .faq details::details-content {
+    height: 0;
+    overflow: clip;
+    transition:
+      height 0.25s ease,
+      content-visibility 0.25s allow-discrete;
+  }
+  .faq details[open]::details-content {
+    height: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .faq-section {
+    grid-template-columns: 1fr;
+  }
 }
 
 footer {

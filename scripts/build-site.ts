@@ -355,8 +355,8 @@ function reelHtml(items: SiteItem[]): string {
 function faqHtml(): string {
   return FAQ.map(
     ({ question, answer }) => `
-<details>
-  <summary><h3>${escapeHtml(question)}</h3></summary>
+<details name="faq">
+  <summary><h3>${escapeHtml(question)}</h3><span class="faq-icon" aria-hidden="true"></span></summary>
   <p>${escapeHtml(answer)}</p>
 </details>`
   ).join('');

@@ -56,7 +56,7 @@ motionButton.addEventListener('click', () => {
   announce(motion ? 'Animations playing' : 'Animations paused');
 });
 
-for (const video of document.querySelectorAll('.reel video, .remix-video')) {
+for (const video of document.querySelectorAll('.reel video')) {
   viewport.observe(video);
 }
 

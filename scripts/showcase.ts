@@ -93,14 +93,5 @@ export const SHOWCASE: ShowcaseItem[] = [
     blurb:
       'Two sets of fine rings with slightly different spacing circle each other, and their interference makes broad spiral fringes that stream outward.',
     credit: "Bridget Riley's op art and Ryoji Ikeda's precise minimalism"
-  },
-  {
-    name: 'hello-loop',
-    title: 'Hello Loop',
-    durationSeconds: 3,
-    loops: true,
-    blurb:
-      'Twelve dots orbit while two swells travel around the ring. The smallest example of driving every motion from p5Render.progress.',
-    credit: 'the looping GIF tradition of Bees & Bombs'
   }
 ];

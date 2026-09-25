@@ -93,12 +93,6 @@ Most sketches work unchanged. A few habits make renders exact and loops seamless
 - **Instance mode works**, as in `new p5((p) => { ... })`.
 - Avoid live input such as `mouseX`, the webcam or the microphone.
 
-<img src="docs/media/hello-loop.webp" width="180" align="right" alt="Hello Loop">
-
-See [`examples/hello-loop.js`](examples/hello-loop.js) for a minimal loop in about 25 lines.
-
-<br clear="right">
-
 ## Debug mode
 
 `--debug` draws a HUD onto each captured frame: the frame number, time, how long `draw()` took, the seed, a timeline and viewfinder marks. The HUD is added while encoding, so it never touches your sketch's canvas or state. The draw time is the quickest way to find a slow sketch.
@@ -160,17 +154,6 @@ pnpm site         # render the demo site into site/dist (needs cwebp)
 ```
 
 CI runs `pnpm check` with the browser tests on Node 22 and 24. The `Demo site` workflow renders the showcase examples and publishes `site/dist` to GitHub Pages.
-
-## Remixes
-
-Promo art and remixes made with [Glif](https://glif.app), using real frames and the rendered Cube Wave loop as references.
-
-<p align="center"><img src="docs/media/remix-stopmotion.webp" width="600" alt="Cube Wave remade as a stop-motion animation of wooden blocks"></p>
-
-<p align="center">
-  <img src="docs/media/remix-riso.webp" width="300" alt="Risograph-style print of the cube wave and pulsar ridges">
-  <img src="docs/media/remix-swiss.webp" width="300" alt="Swiss-style FRAME BY FRAME poster with the dot lattice and Truchet ribbons">
-</p>
 
 ## Alternatives
 
