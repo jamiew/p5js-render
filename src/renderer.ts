@@ -270,7 +270,9 @@ export class P5Renderer {
 
     const context = await this.browser.newContext({
       viewport: { width: resolvedConfig.width, height: resolvedConfig.height },
-      deviceScaleFactor: 1
+      // Matches devicePixelRatio to the density, so screenshot captures and
+      // any DOM content render at the same resolution as the canvas.
+      deviceScaleFactor: resolvedConfig.pixelDensity ?? DEFAULT_PIXEL_DENSITY
     });
     try {
       const page = await context.newPage();

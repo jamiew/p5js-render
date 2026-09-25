@@ -59,8 +59,11 @@ interface P5Instance {
   deltaTime: number;
   drawingContext?: { canvas: HTMLCanvasElement };
   _setProperty?: (name: string, value: unknown) => void;
-  createCanvas: (width: number, height: number) => unknown;
-  pixelDensity: (density: number) => unknown;
+  createCanvas: (...args: unknown[]) => unknown;
+  pixelDensity: {
+    (): number;
+    (density: number): unknown;
+  };
   frameRate: (fps: number) => unknown;
   noLoop: () => void;
   redraw: () => unknown;
@@ -71,10 +74,12 @@ interface SketchTarget {
   draw?: (this: unknown) => unknown;
 }
 
-type P5Constructor = new (
+type P5Constructor = (new (
   sketch: (instance: P5Instance & SketchTarget) => void,
   node?: unknown
-) => P5Instance;
+) => P5Instance) & {
+  prototype: P5Instance;
+};
 
 /** Read-only render facts exposed to sketches as `window.p5Render`. */
 export interface RenderInfo {
@@ -281,6 +286,18 @@ export function installHarness(settings: HarnessSettings): void {
       if (!Original) {
         return;
       }
+      // p5 2.x gives every new main canvas ceil(devicePixelRatio) density,
+      // ignoring earlier pixelDensity() calls. Reapply the requested density
+      // right after creation, before the sketch has drawn anything. A sketch
+      // that calls pixelDensity() itself afterwards still gets its own value.
+      const createCanvas = Original.prototype.createCanvas;
+      Original.prototype.createCanvas = function (this: P5Instance, ...args) {
+        const canvas = createCanvas.apply(this, args);
+        if (this.pixelDensity() !== settings.pixelDensity) {
+          this.pixelDensity(settings.pixelDensity);
+        }
+        return canvas;
+      };
       const Patched = class extends Original {
         constructor(
           sketch: (instance: P5Instance & SketchTarget) => void,

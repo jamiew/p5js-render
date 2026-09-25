@@ -122,6 +122,20 @@ describe.skipIf(!runBrowserTests)('P5Renderer in Chromium', () => {
     ]);
   });
 
+  it('renders at the requested pixel density, including fractional ones', async () => {
+    const result = await renderer.renderSketch({
+      code: 'function setup() { createCanvas(4, 2); } function draw() { background(0); }',
+      width: 4,
+      height: 2,
+      frameRate: 30,
+      durationSeconds: 1 / 30,
+      pixelDensity: 1.5
+    });
+    const png = result.frames[0].buffer;
+    // IHDR holds the image width and height right after the chunk header.
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([6, 3]);
+  });
+
   it('reports errors thrown during setup with the sketch message', async () => {
     await expect(
       render(`function setup() { throw new Error('bad palette'); }`)
