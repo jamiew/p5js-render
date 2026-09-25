@@ -2,4 +2,6 @@ dist/
 node_modules/
 output/
 coverage/
-package-lock.json
+pnpm-lock.yaml
+site/dist/
+docs/media/

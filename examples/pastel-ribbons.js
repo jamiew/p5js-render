@@ -170,16 +170,16 @@ class Ribbon {
         let wobbleY = cos(point.time * 3.5 + layer) * 3 * life;
 
         if (i === layer) {
-          curveVertex(point.x + wobbleX, point.y + wobbleY);
+          splineVertex(point.x + wobbleX, point.y + wobbleY);
         }
-        curveVertex(point.x + wobbleX, point.y + wobbleY);
+        splineVertex(point.x + wobbleX, point.y + wobbleY);
       }
 
       if (this.points.length > layer + 1) {
         let lastPoint = this.points[this.points.length - 1];
         let wobbleX = sin(lastPoint.time * 4 + layer) * 3;
         let wobbleY = cos(lastPoint.time * 3.5 + layer) * 3;
-        curveVertex(lastPoint.x + wobbleX, lastPoint.y + wobbleY);
+        splineVertex(lastPoint.x + wobbleX, lastPoint.y + wobbleY);
       }
 
       endShape();

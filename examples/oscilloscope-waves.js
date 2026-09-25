@@ -42,11 +42,11 @@ function draw() {
       stroke(hue, saturation, brightness, alpha);
 
       if (x === 0) {
-        curveVertex(x, y);
+        splineVertex(x, y);
       }
-      curveVertex(x, y);
+      splineVertex(x, y);
       if (x >= width - 2) {
-        curveVertex(x, y);
+        splineVertex(x, y);
       }
     }
     endShape();

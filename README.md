@@ -1,190 +1,178 @@
-# P5.js Server-Side Video Renderer
+<p align="center"><img src="docs/media/hero.jpg" alt="p5js-render" width="100%"></p>
 
-Offline/server-side rendering for p5.js sketches. The renderer runs sketches in headless Chromium through Playwright for browser fidelity, captures deterministic frames, and encodes video with ffmpeg.
+# p5js-render
 
-## Alternatives
+Render p5.js sketches to MP4, WebM or GIF in headless Chromium. Every frame is drawn once, in order, on a virtual clock with a seeded random generator, so the same sketch always makes the same video.
 
-- [`p5.capture`](https://github.com/tapioca24/p5.capture) is a strong choice for in-browser/client-side recording with a UI or small API. Use this project instead when you want CLI/API rendering, batch jobs, server-side output, or CI automation.
-- General browser automation renderers like [`html5-animation-video-renderer`](https://github.com/dtinth/html5-animation-video-renderer) solve a similar frame-by-frame problem for HTML/canvas animations; this repo is specialized for p5.js runtime/version options and `frameCount` stepping.
-- Pure Node canvas rendering can be faster for narrow 2D cases, but Chromium gives better p5.js compatibility for browser behavior, assets, fonts, and WebGL.
+**[See the gallery, debug views and film strips on the demo site.](https://jamiew.github.io/p5js-renderer/)**
 
-## Features
+## Gallery
 
-- Headless Chromium rendering via Playwright, so normal browser p5.js sketches work.
-- Local p5.js runtime by default for offline repeatability.
-- Optional p5 runtime selection by version, script URL, or local script path.
-- Deterministic frame stepping through a generated `__p5RenderFrame(frameNumber)` wrapper.
-- Canvas-byte capture by default, with screenshot capture as a fallback option.
-- MP4 encoding through ffmpeg from captured frames.
-- Fastify API for programmatic frame rendering.
-- TypeScript, ESLint, Vitest, and GitHub Actions CI.
+Every preview below was rendered by this tool from a sketch in [`examples/`](examples). Click one to read its source.
 
-## Requirements
+<table>
+  <tr>
+    <td align="center"><a href="examples/cube-wave.js"><img src="docs/media/cube-wave.webp" width="260" alt="Cube Wave"></a><br><b>Cube Wave</b><br><sub>after Bees &amp; Bombs</sub></td>
+    <td align="center"><a href="examples/pulsar-ridges.js"><img src="docs/media/pulsar-ridges.webp" width="260" alt="Pulsar Ridges"></a><br><b>Pulsar Ridges</b><br><sub>after Unknown Pleasures</sub></td>
+    <td align="center"><a href="examples/clifford-bloom.js"><img src="docs/media/clifford-bloom.webp" width="260" alt="Clifford Bloom"></a><br><b>Clifford Bloom</b><br><sub>strange attractor density map</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="examples/flow-fibers.js"><img src="docs/media/flow-fibers.webp" width="260" alt="Flow Fibers"></a><br><b>Flow Fibers</b><br><sub>after Tyler Hobbs</sub></td>
+    <td align="center"><a href="examples/truchet-weave.js"><img src="docs/media/truchet-weave.webp" width="260" alt="Truchet Weave"></a><br><b>Truchet Weave</b><br><sub>Truchet tiles, Vera Molnar palette</sub></td>
+    <td align="center"><a href="examples/reaction-diffusion.js"><img src="docs/media/reaction-diffusion.webp" width="260" alt="Reaction Diffusion"></a><br><b>Reaction Diffusion</b><br><sub>Gray-Scott Turing patterns</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="examples/dot-lattice.js"><img src="docs/media/dot-lattice.webp" width="260" alt="Dot Lattice"></a><br><b>Dot Lattice</b><br><sub>after Etienne Jacob</sub></td>
+    <td align="center"><a href="examples/schotter-drift.js"><img src="docs/media/schotter-drift.webp" width="260" alt="Schotter Drift"></a><br><b>Schotter Drift</b><br><sub>after Georg Nees, 1968</sub></td>
+    <td align="center"><a href="examples/moire-orbit.js"><img src="docs/media/moire-orbit.webp" width="260" alt="Moire Orbit"></a><br><b>Moire Orbit</b><br><sub>after Bridget Riley</sub></td>
+  </tr>
+</table>
 
-- Node.js 22 or newer
-- ffmpeg available on `PATH`
-- Playwright Chromium browser
+Flow Fibers and Reaction Diffusion are stateful: each frame builds on the last. The film strip shows Flow Fibers growing, one frame every 1.3 seconds.
 
-```bash
-npm install
-npx playwright install chromium
-```
+<p align="center"><img src="docs/media/flow-fibers-strip.jpg" alt="Film strip of Flow Fibers growing over eight seconds" width="100%"></p>
 
-## CLI Usage
+`examples/` also keeps the earlier sketches, such as `plasma-field`, `fractal-tree` and `voronoi-shards`. `pnpm render:all` renders all of them.
 
-Render an example sketch directly to `output/<sketch-name>.mp4`:
+## Quick start
 
-```bash
-npm run render simple-circle
-```
-
-Render inline code:
+You need Node.js 22.18 or newer, pnpm and ffmpeg on your `PATH`.
 
 ```bash
-npm run render:code "function setup() { createCanvas(400, 400); } function draw() { background(frameCount * 8); circle(200, 200, 100); }"
+pnpm install
+pnpm exec playwright install chromium
+
+pnpm render cube-wave                 # writes output/cube-wave.mp4
+pnpm render cube-wave --debug         # same, with the debug HUD burned in
+pnpm render ./my-sketch.js -o loop.gif --duration 3
+pnpm render:all --duration 6          # every sketch in examples/
 ```
 
-Render a sketch from a URL:
+Node runs the TypeScript sources directly, so there is no build step for local use.
 
-```bash
-npm run render:url "https://example.com/sketch.js"
+## CLI
+
+`pnpm render <sketch> [options]` takes an example name, a path to a `.js` file or an `http(s)` URL. Use `--code "<p5 code>"` for inline sketches and `--all` for every example.
+
+| Option                                    | What it does                                                                          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------- |
+| `-o, --output <file>`                     | Output path. The extension picks the format: `.mp4` (H.264), `.webm` (VP9) or `.gif`. |
+| `--out-dir <dir>`                         | Where default outputs go. Default `output`.                                           |
+| `--frames <dir>`                          | Also save every frame as an image.                                                    |
+| `-f, --fps <n>`                           | Frames per second. Default 30.                                                        |
+| `-d, --duration <sec>`                    | Length in seconds. Default 4.                                                         |
+| `-s, --seed <n>`                          | Seed for `random()` and `noise()`. Default 1.                                         |
+| `-w, --width`, `--height`                 | Canvas size when the sketch has no literal `createCanvas(w, h)`. Default 800x600.     |
+| `--debug`                                 | Burn in a HUD with frame number, time, draw cost and seed.                            |
+| `--crf <n>`                               | Video quality, lower is better. Defaults: 18 for MP4, 30 for WebM.                    |
+| `--pixel-density <n>`                     | p5 pixel density. Default 1, so output size equals canvas size.                       |
+| `--format png\|jpeg`, `--quality <0-100>` | Image format for captured frames.                                                     |
+| `--capture canvas\|screenshot`            | `screenshot` captures the whole page, for sketches that draw with DOM elements.       |
+| `--timeout <ms>`                          | How long `setup()` may take. Default 30000.                                           |
+| `--p5-version`, `--p5-url`, `--p5-path`   | Load a different p5 build, for example `--p5-version 1.11.13` for older sketches.     |
+
+## Writing sketches for rendering
+
+Most sketches work unchanged. A few habits make renders exact and loops seamless.
+
+- **Animate from `p5Render.progress` for loops.** The renderer exposes `window.p5Render` with `progress` (0 up to, not including, 1), `frame`, `totalFrames`, `time`, `frameRate`, `seed` and `debug`. Fall back to `frameCount` so the sketch still runs in the p5 editor:
+
+  ```js
+  const t = window.p5Render ? p5Render.progress : (frameCount % 90) / 90;
+  const angle = TWO_PI * t; // one full turn per video, whatever the duration
+  ```
+
+- **Randomness is seeded for you.** `random()`, `noise()` and `Math.random()` repeat for the same `--seed`. Change the seed to get a new variation.
+- **Time is virtual.** `millis()`, `deltaTime`, `performance.now()` and `new Date()` report the frame's time, so a slow frame never causes a jump.
+- **State is safe.** Frames are drawn once each, in order, on one page. Trails, particle systems and simulations render exactly as they would live.
+- **`async setup()` works**, for example `img = await loadImage('texture.png')`. Local sketches can load files relative to their own folder.
+- **Instance mode works**, as in `new p5((p) => { ... })`.
+- Avoid live input such as `mouseX`, the webcam or the microphone.
+
+<img src="docs/media/hello-loop.webp" width="180" align="right" alt="Hello Loop">
+
+See [`examples/hello-loop.js`](examples/hello-loop.js) for a minimal loop in about 25 lines.
+
+<br clear="right">
+
+## Debug mode
+
+`--debug` draws a HUD onto each captured frame: the frame number, time, how long `draw()` took, the seed, a timeline and viewfinder marks. The HUD is added while encoding, so it never touches your sketch's canvas or state. The draw time is the quickest way to find a slow sketch.
+
+<p align="center"><img src="docs/media/cube-wave-debug.webp" width="360" alt="Cube Wave rendered with the debug HUD"></p>
+
+## How it works
+
+```mermaid
+flowchart LR
+  A[sketch.js] --> B[Chromium page<br/>seeded RNG + virtual clock]
+  B -->|draw frame N| C[Worker pool<br/>PNG encoding]
+  C -->|batches of frames| D[Node]
+  D -->|stdin| E[ffmpeg<br/>MP4, WebM or GIF]
 ```
 
-Render every sketch in `examples/`:
+1. Playwright opens a page on a local origin and serves p5, the sketch and its assets from disk.
+2. A harness script runs before p5. It seeds `Math.random`, replaces the clock and wraps `setup()` and `draw()`.
+3. For each frame the harness sets `frameCount`, the virtual time and `deltaTime`, then awaits `redraw()`.
+4. The canvas is copied to an `ImageBitmap` and handed to a worker pool that encodes PNGs off the main thread, so the next frame draws while earlier ones compress.
+5. Frames stream to ffmpeg in order as they arrive, so long renders never hold every frame in memory.
 
-```bash
-npm run render:all
-```
+## Library and HTTP API
 
-## Render Options
-
-CLI options are provided with environment variables:
-
-```bash
-WIDTH=1920 HEIGHT=1080 FRAMERATE=60 DURATION=5 npm run render rotating-cubes
-```
-
-Supported options:
-
-- `WIDTH`, `HEIGHT`: output canvas dimensions.
-- `FRAMERATE`: output frames per second.
-- `DURATION`: duration in seconds.
-- `PIXEL_DENSITY`: p5 pixel density, default `1` for predictable output dimensions.
-- `BACKGROUND_COLOR`: page background behind the canvas.
-- `FORMAT`: captured frame format, `png` or `jpeg`.
-- `QUALITY`: JPEG quality from `0` to `100`.
-- `CRF`: ffmpeg H.264 quality, default `18`.
-- `OUTPUT`: output MP4 path.
-- `SAVE_FRAMES=1`: also write frames to `output/<sketch-name>/`.
-- `CAPTURE_METHOD`: `canvas` or `screenshot`. Canvas capture is faster; screenshot can be useful for WebGL or DOM-heavy sketches.
-- `MAX_CONCURRENCY`: number of parallel browser contexts for frame capture.
-- `TIMEOUT_MS`: p5 startup timeout.
-- `P5_VERSION`: load a specific p5 version from jsDelivr, for example `1.11.13` or `2.2.3`.
-- `P5_SCRIPT_URL`: load p5 from an explicit URL.
-- `P5_SCRIPT_PATH`: load p5 from a local file.
-
-The default p5 runtime is the locally installed `p5` package. This repo tracks the current p5 release; use `P5_VERSION=1.11.13` or `P5_SCRIPT_PATH` when rendering older sketches that need the p5 1.x runtime.
-
-## API Usage
-
-Start the server:
-
-```bash
-npm run dev
-```
-
-`POST /render` returns base64-encoded frames:
-
-```json
-{
-  "code": "function setup() { createCanvas(800, 600); } function draw() { background(frameCount * 8); }",
-  "width": 800,
-  "height": 600,
-  "frameRate": 30,
-  "durationSeconds": 2,
-  "pixelDensity": 1,
-  "format": "png",
-  "captureMethod": "canvas",
-  "maxConcurrency": 4,
-  "p5Version": "2.2.3"
-}
-```
-
-Response:
-
-```json
-{
-  "totalFrames": 60,
-  "durationMs": 1234,
-  "frames": [
-    {
-      "frameNumber": 0,
-      "timestamp": 0,
-      "data": "base64-encoded-image-data"
-    }
-  ]
-}
-```
-
-`GET /health` returns server status.
-
-## Programmatic Usage
-
-```typescript
-import { P5Renderer } from './src/renderer.js';
+```ts
+import { P5Renderer, encodeVideo } from 'p5js-render';
 
 const renderer = new P5Renderer();
 await renderer.initialize();
-
 try {
-  const result = await renderer.renderSketch(
+  const frames = renderer.streamFrames(
     {
-      code: `
-        function setup() {
-          createCanvas(400, 400);
-        }
-
-        function draw() {
-          background(frameCount % 255);
-          circle(200, 200, 100);
-        }
-      `,
-      width: 400,
-      height: 400,
+      code,
+      width: 720,
+      height: 720,
       frameRate: 30,
-      durationSeconds: 1
+      durationSeconds: 4,
+      seed: 7
     },
-    {
-      captureMethod: 'canvas',
-      maxConcurrency: 2
-    }
+    { debug: true }
   );
-
-  console.log(`Rendered ${result.totalFrames} frames`);
+  await encodeVideo(frames, { outputPath: 'loop.mp4', frameRate: 30 });
 } finally {
   await renderer.cleanup();
 }
 ```
 
-## Sketch Guidance
+`renderer.renderSketch(config, options)` returns every frame in memory instead.
 
-- Prefer deterministic animation based on `frameCount`, not wall-clock time.
-- Avoid relying on live input such as `mouseX`, `mouseY`, keyboard state, webcam, or microphone input.
-- If a sketch declares literal `createCanvas(width, height)` dimensions, the renderer adopts them.
-- For WebGL sketches, try `CAPTURE_METHOD=screenshot` if canvas capture produces blank frames.
-- If an older sketch behaves differently under p5 2.x, render it with `P5_VERSION=1.11.13`.
+`pnpm start` runs a Fastify server. `POST /render` takes the same fields as JSON (`code`, `width`, `height`, `frameRate`, `durationSeconds`, plus optional `seed`, `pixelDensity`, `backgroundColor`, `format`, `quality`, `captureMethod`, `debug`, `p5Version`, `p5ScriptUrl`, `timeoutMs`) and returns base64-encoded frames. Invalid input gets a 400 with a readable message. `GET /health` reports status.
 
 ## Development
 
 ```bash
-npm run typecheck
-npm run lint
-npm run format:check
-npm test -- --run
-npm run check
+pnpm check        # typecheck, lint, format check and tests
+RUN_BROWSER_TESTS=1 pnpm test --run   # include the Chromium integration tests
+pnpm media        # rebuild the README previews in docs/media (needs img2webp)
+pnpm site         # render the demo site into site/dist
 ```
 
-`npm run check` runs typechecking, linting, formatting checks, and tests. CI runs the same command on Node 22 and 24 after installing Playwright Chromium.
+CI runs `pnpm check` with the browser tests on Node 22 and 24. The `Demo site` workflow renders the showcase examples and publishes `site/dist` to GitHub Pages.
+
+## Remixes
+
+Promo art and remixes made with [Glif](https://glif.app), using real frames and the rendered Cube Wave loop as references.
+
+<p align="center"><img src="docs/media/remix-stopmotion.webp" width="600" alt="Cube Wave remade as a stop-motion animation of wooden blocks"></p>
+
+<p align="center">
+  <img src="docs/media/remix-riso.jpg" width="300" alt="Risograph-style print of the cube wave and pulsar ridges">
+  <img src="docs/media/remix-swiss.jpg" width="300" alt="Swiss-style FRAME BY FRAME poster with the dot lattice and Truchet ribbons">
+</p>
+
+## Alternatives
+
+- [`p5.capture`](https://github.com/tapioca24/p5.capture) records in the browser with a UI. Use this project for CLI or server renders, batch jobs and CI.
+- [Remotion](https://www.remotion.dev/) renders React compositions to video. It is a good fit if you want a timeline and components rather than p5 sketches.
+- General renderers such as [`html5-animation-video-renderer`](https://github.com/dtinth/html5-animation-video-renderer) step arbitrary canvas pages frame by frame. This project knows p5's lifecycle, so `frameCount`, `millis()`, `random()` and `async setup()` behave.
 
 ## License
 

@@ -102,7 +102,7 @@ function draw() {
       let diskR = ringRadius + sin(a * 8 + ringTime) * 5;
       let diskX = centerX + cos(a + ringTime) * diskR;
       let diskY = centerY + sin(a + ringTime) * diskR;
-      curveVertex(diskX, diskY);
+      splineVertex(diskX, diskY);
     }
     endShape(CLOSE);
   }

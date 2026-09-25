@@ -42,11 +42,11 @@ function draw() {
       let y = centerY + sin(angle) * radius;
 
       if (i === 0) {
-        curveVertex(x, y);
+        splineVertex(x, y);
       }
-      curveVertex(x, y);
+      splineVertex(x, y);
       if (i === numVertices) {
-        curveVertex(x, y);
+        splineVertex(x, y);
       }
     }
     endShape();

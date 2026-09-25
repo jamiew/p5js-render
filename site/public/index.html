@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>p5js-render: p5.js sketches to video, frame by frame</title>
+    <meta
+      name="description"
+      content="Render p5.js sketches to MP4, WebM or GIF in headless Chromium. Seeded, frame-exact and offline."
+    />
+    <meta property="og:title" content="p5js-render" />
+    <meta
+      property="og:description"
+      content="Render p5.js sketches to video, frame by frame."
+    />
+    <meta property="og:image" content="assets/og.jpg" />
+    <link rel="icon" href="assets/favicon.png" />
+    <style>
+      :root {
+        --bg: #0b0c0f;
+        --panel: #14161b;
+        --line: #262a33;
+        --text: #e9e6df;
+        --muted: #8d9099;
+        --accent: #7cffb2;
+        --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          16px/1.55 system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+      a {
+        color: var(--accent);
+      }
+      code,
+      pre {
+        font-family: var(--mono);
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+      header {
+        padding: 32px 0 24px;
+      }
+      .hero img {
+        width: 100%;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        display: block;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+      }
+      .intro {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 24px;
+        flex-wrap: wrap;
+        margin-top: 24px;
+      }
+      .remixes {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 24px;
+      }
+      .remixes figure {
+        margin: 0;
+      }
+      .remixes img,
+      .remixes video {
+        width: 100%;
+        display: block;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+      }
+      .remixes figcaption {
+        font-size: 13px;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      .lede {
+        font-size: 20px;
+        color: #c9c6be;
+        max-width: 34em;
+      }
+      .buttons {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+        flex-wrap: wrap;
+      }
+      .button {
+        font: 600 14px var(--mono);
+        padding: 10px 16px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        color: var(--text);
+        text-decoration: none;
+        background: var(--panel);
+      }
+      .button.primary {
+        background: var(--accent);
+        color: #0b0c0f;
+        border-color: var(--accent);
+      }
+      pre {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px 18px;
+        overflow-x: auto;
+        font-size: 14px;
+        line-height: 1.7;
+      }
+      pre .c {
+        color: var(--muted);
+      }
+      section.wrap {
+        padding-top: 40px;
+        padding-bottom: 40px;
+      }
+      h2 {
+        font: 600 14px var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--muted);
+        margin: 0 0 20px;
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+      .toolbar h2 {
+        margin: 0;
+      }
+      .toggle {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 3px;
+        background: var(--panel);
+      }
+      .toggle button {
+        font: 600 12px var(--mono);
+        border: 0;
+        background: none;
+        color: var(--muted);
+        padding: 6px 12px;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .toggle button[aria-pressed='true'] {
+        background: var(--text);
+        color: var(--bg);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 28px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .card video {
+        width: 100%;
+        aspect-ratio: 1;
+        display: block;
+        background: #000;
+      }
+      .card-body {
+        padding: 16px 18px 18px;
+      }
+      .card-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+      }
+      .card h3 {
+        font: 700 18px var(--mono);
+        margin: 0;
+      }
+      .meta {
+        font: 12px var(--mono);
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .card p {
+        margin: 10px 0 6px;
+        color: #cfccc4;
+        font-size: 15px;
+      }
+      .credit {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .film {
+        position: relative;
+        margin: 14px -18px 0;
+        padding: 12px 0;
+        background:
+          radial-gradient(circle at center, var(--bg) 3px, transparent 3.5px) 0
+            2px / 14px 8px repeat-x,
+          radial-gradient(circle at center, var(--bg) 3px, transparent 3.5px) 0
+            calc(100% - 2px) / 14px 8px repeat-x,
+          #050506;
+        cursor: ew-resize;
+        touch-action: none;
+      }
+      .film img {
+        display: block;
+        width: 100%;
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+      .playhead {
+        position: absolute;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--accent);
+        box-shadow: 0 0 8px var(--accent);
+        pointer-events: none;
+      }
+      .film-label {
+        display: flex;
+        justify-content: space-between;
+        font: 11px var(--mono);
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-top: 14px;
+        flex-wrap: wrap;
+      }
+      .actions code {
+        font-size: 12px;
+        color: var(--muted);
+        background: #0f1115;
+        border: 1px solid var(--line);
+        padding: 4px 8px;
+        border-radius: 6px;
+        cursor: copy;
+      }
+      .how {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 20px;
+      }
+      .how div {
+        border-top: 2px solid var(--accent);
+        padding-top: 12px;
+      }
+      .how h3 {
+        font: 700 15px var(--mono);
+        margin: 0 0 6px;
+      }
+      .how p {
+        margin: 0;
+        color: #bdbab2;
+        font-size: 15px;
+      }
+      footer {
+        padding: 40px 0 60px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="wrap">
+      <h1 class="visually-hidden">p5js-render</h1>
+      <div class="hero">
+        <img
+          src="assets/hero.jpg"
+          alt="p5js-render: a film strip of generative artworks rendered frame by frame"
+        />
+      </div>
+      <div class="intro">
+        <p class="lede">
+          Render p5.js sketches to MP4, WebM or GIF in headless Chromium. Every
+          frame is drawn once, in order, on a virtual clock with a seeded random
+          generator, so the same sketch always makes the same video.
+        </p>
+        <div class="buttons">
+          <a
+            class="button primary"
+            href="https://github.com/jamiew/p5js-renderer"
+            >GitHub</a
+          >
+          <a class="button" href="#gallery">Gallery</a>
+          <a class="button" href="#how">How it works</a>
+        </div>
+      </div>
+    </header>
+
+    <section class="wrap">
+      <h2>Quick start</h2>
+      <pre><span class="c"># install, then fetch the browser once</span>
+pnpm install &amp;&amp; pnpm exec playwright install chromium
+
+<span class="c"># render an example, with the debug HUD burned in</span>
+pnpm render cube-wave --debug
+
+<span class="c"># render your own sketch to a looping GIF</span>
+pnpm render ./sketch.js -o sketch.gif --duration 4</pre>
+    </section>
+
+    <section class="wrap" id="gallery">
+      <div class="toolbar">
+        <h2>Gallery</h2>
+        <div class="toggle" role="group" aria-label="Video mode">
+          <button type="button" data-mode="clean" aria-pressed="true">
+            Clean
+          </button>
+          <button type="button" data-mode="debug" aria-pressed="false">
+            Debug HUD
+          </button>
+        </div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+
+    <section class="wrap" id="how">
+      <h2>How it works</h2>
+      <div class="how">
+        <div>
+          <h3>Seeded randomness</h3>
+          <p>
+            Math.random is replaced with a seeded generator, so p5's random()
+            and noise() repeat for the same seed.
+          </p>
+        </div>
+        <div>
+          <h3>Virtual clock</h3>
+          <p>
+            performance.now, Date and millis() report the frame's time, not the
+            wall clock. Slow frames never drift.
+          </p>
+        </div>
+        <div>
+          <h3>Every frame, in order</h3>
+          <p>
+            Frames are drawn one after another on one page, so trails, particles
+            and simulations stay correct.
+          </p>
+        </div>
+        <div>
+          <h3>Off-thread encoding</h3>
+          <p>
+            A worker pool compresses frames while the next ones draw, then
+            streams them straight into ffmpeg.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="wrap" id="remixes">
+      <h2>Remixes</h2>
+      <div class="remixes">
+        <figure>
+          <video
+            src="assets/remix-stopmotion.mp4"
+            muted
+            loop
+            playsinline
+            autoplay
+          ></video>
+          <figcaption>
+            Cube wave remade as stop-motion wooden blocks, following the
+            rendered loop's motion.
+          </figcaption>
+        </figure>
+        <figure>
+          <img
+            src="assets/remix-riso.jpg"
+            alt="Risograph-style print of the cube wave and pulsar ridges"
+            loading="lazy"
+          />
+          <figcaption>
+            Cube wave and pulsar ridges as a two-color risograph print.
+          </figcaption>
+        </figure>
+        <figure>
+          <img
+            src="assets/remix-swiss.jpg"
+            alt="Swiss-style poster titled FRAME BY FRAME with the dot lattice and Truchet ribbons"
+            loading="lazy"
+          />
+          <figcaption>
+            Dot lattice and Truchet weave as a Swiss exhibition poster.
+          </figcaption>
+        </figure>
+      </div>
+      <p class="credit">
+        Promo art and remixes made with <a href="https://glif.app">Glif</a> from
+        real frames rendered by this tool.
+      </p>
+    </section>
+
+    <footer class="wrap">
+      Made with p5.js, Playwright and ffmpeg. Videos on this page were rendered
+      by GitHub Actions from the
+      <a href="https://github.com/jamiew/p5js-renderer/tree/main/examples"
+        >examples</a
+      >.
+    </footer>
+
+    <template id="card">
+      <article class="card">
+        <video muted loop playsinline autoplay preload="metadata"></video>
+        <div class="card-body">
+          <div class="card-head">
+            <h3></h3>
+            <span class="meta"></span>
+          </div>
+          <p class="blurb"></p>
+          <div class="credit"></div>
+          <div class="film" title="Drag to scrub">
+            <img alt="" loading="lazy" />
+            <div class="playhead"></div>
+          </div>
+          <div class="film-label">
+            <span class="frame">frame 0</span
+            ><span>drag the strip to scrub</span>
+          </div>
+          <div class="actions">
+            <a class="source">Source</a>
+            <code title="Click to copy"></code>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script type="module">
+      const grid = document.getElementById('grid');
+      const template = document.getElementById('card');
+      const toggles = [...document.querySelectorAll('.toggle button')];
+      const cards = [];
+      let mode = 'clean';
+
+      const items = await (await fetch('showcase.json')).json();
+
+      for (const item of items) {
+        const node = template.content.firstElementChild.cloneNode(true);
+        const video = node.querySelector('video');
+        const film = node.querySelector('.film');
+        const playhead = node.querySelector('.playhead');
+        const frameLabel = node.querySelector('.frame');
+        const command = node.querySelector('code');
+
+        video.src = item.video;
+        video.poster = item.poster;
+        node.querySelector('h3').textContent = item.title;
+        node.querySelector('.meta').textContent =
+          `${item.frames} frames · ${item.durationSeconds}s · ${item.loops ? 'loop' : 'build'}`;
+        node.querySelector('.blurb').textContent = item.blurb;
+        node.querySelector('.credit').textContent = `After ${item.credit}`;
+        node.querySelector('.film img').src = item.strip;
+        node.querySelector('.source').href = item.source;
+        command.textContent = item.command;
+        command.addEventListener('click', () =>
+          navigator.clipboard?.writeText(item.command)
+        );
+
+        const frameAt = (time) =>
+          Math.min(item.frames - 1, Math.floor(time * item.frameRate));
+        const update = () => {
+          const fraction = video.duration
+            ? video.currentTime / video.duration
+            : 0;
+          playhead.style.left = `${fraction * 100}%`;
+          frameLabel.textContent = `frame ${frameAt(video.currentTime)} / ${item.frames}`;
+        };
+        const tick = () => {
+          update();
+          video.requestVideoFrameCallback?.(tick);
+        };
+        video.requestVideoFrameCallback
+          ? video.requestVideoFrameCallback(tick)
+          : video.addEventListener('timeupdate', update);
+
+        const scrub = (event) => {
+          const box = film.getBoundingClientRect();
+          const fraction = Math.min(
+            0.9999,
+            Math.max(0, (event.clientX - box.left) / box.width)
+          );
+          video.pause();
+          video.currentTime = fraction * item.durationSeconds;
+          update();
+        };
+        film.addEventListener('pointerdown', (event) => {
+          film.setPointerCapture(event.pointerId);
+          scrub(event);
+          film.addEventListener('pointermove', scrub);
+        });
+        film.addEventListener('pointerup', () => {
+          film.removeEventListener('pointermove', scrub);
+          video.play();
+        });
+
+        cards.push({ item, video });
+        grid.append(node);
+      }
+
+      const setMode = (next) => {
+        mode = next;
+        for (const button of toggles) {
+          button.setAttribute(
+            'aria-pressed',
+            String(button.dataset.mode === mode)
+          );
+        }
+        for (const { item, video } of cards) {
+          const time = video.currentTime;
+          video.src = mode === 'debug' ? item.debugVideo : item.video;
+          video.currentTime = time;
+          video.play();
+        }
+      };
+      for (const button of toggles) {
+        button.addEventListener('click', () => setMode(button.dataset.mode));
+      }
+    </script>
+  </body>
+</html>

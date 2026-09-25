@@ -1,57 +1,64 @@
-import { readFileSync } from 'fs';
-import { createRequire } from 'module';
-import { dirname, join, resolve } from 'path';
-import { cpus } from 'os';
-import { chromium, Browser, Page, PageScreenshotOptions } from 'playwright';
+import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { availableParallelism } from 'node:os';
+import { dirname, join, resolve, sep } from 'node:path';
+import { chromium, type Browser, type Page } from 'playwright';
+import {
+  encodeWorker,
+  installHarness,
+  type BatchRequest,
+  type CapturedFrame,
+  type HarnessSettings,
+  type HarnessStatus
+} from './harness.ts';
 import {
   CAPTURE_METHODS,
   IMAGE_FORMATS,
-  SketchConfig,
-  RenderOptions,
-  FrameData,
-  RenderResult
-} from './types.js';
+  type FrameData,
+  type RenderOptions,
+  type RenderResult,
+  type SketchConfig
+} from './types.ts';
 
-const require = createRequire(import.meta.url);
-
-export const DEFAULT_TIMEOUT_MS = 30000;
+export const DEFAULT_TIMEOUT_MS = 30_000;
 export const DEFAULT_PIXEL_DENSITY = 1;
+export const DEFAULT_SEED = 1;
 export const MAX_CANVAS_DIMENSION = 8192;
 export const MAX_TOTAL_FRAMES = 60 * 60 * 10;
 
-type P5ScriptSource = {
-  tag: string;
-  description: string;
-};
+/** Pages load from this origin so sketches get a secure context and can fetch relative assets. */
+const ORIGIN = 'http://p5js-render.localhost';
+const LOCAL_P5_PATH = '/__render/p5.min.js';
+const SKETCH_PATH = '/__render/sketch.js';
+const FRAMES_PER_BATCH = 12;
+
+/** Thrown for invalid input, so callers such as the HTTP API can answer 400. */
+export class RenderConfigError extends Error {
+  override name = 'RenderConfigError';
+}
+
+const require = createRequire(import.meta.url);
+const p5CodeCache = new Map<string, string>();
 
 export function parseCanvasDimensions(
   code: string
 ): { width: number; height: number } | null {
-  const createCanvasRegex = /createCanvas\s*\(\s*(\d+)\s*,\s*(\d+)/;
-  const match = code.match(createCanvasRegex);
-
+  const match = /createCanvas\s*\(\s*(\d+)\s*,\s*(\d+)/.exec(code);
   if (!match) {
     return null;
   }
 
   const width = Number.parseInt(match[1], 10);
   const height = Number.parseInt(match[2], 10);
-
-  if (isValidDimension(width) && isValidDimension(height)) {
-    return { width, height };
-  }
-
-  return null;
+  return isValidDimension(width) && isValidDimension(height)
+    ? { width, height }
+    : null;
 }
 
 export function resolveRenderConfig(config: SketchConfig): SketchConfig {
   const parsedDimensions = parseCanvasDimensions(config.code);
   const resolvedConfig = parsedDimensions
-    ? {
-        ...config,
-        width: parsedDimensions.width,
-        height: parsedDimensions.height
-      }
+    ? { ...config, ...parsedDimensions }
     : config;
 
   validateRenderConfig(resolvedConfig);
@@ -60,11 +67,11 @@ export function resolveRenderConfig(config: SketchConfig): SketchConfig {
 
 export function validateRenderConfig(config: SketchConfig): void {
   if (!config.code.trim()) {
-    throw new Error('Sketch code is required.');
+    throw new RenderConfigError('Sketch code is required.');
   }
 
   if (!isValidDimension(config.width) || !isValidDimension(config.height)) {
-    throw new Error(
+    throw new RenderConfigError(
       `Canvas dimensions must be between 1 and ${MAX_CANVAS_DIMENSION} pixels.`
     );
   }
@@ -74,15 +81,17 @@ export function validateRenderConfig(config: SketchConfig): void {
     config.frameRate <= 0 ||
     config.frameRate > 240
   ) {
-    throw new Error('frameRate must be greater than 0 and no more than 240.');
+    throw new RenderConfigError(
+      'frameRate must be greater than 0 and no more than 240.'
+    );
   }
 
   if (!Number.isFinite(config.durationSeconds) || config.durationSeconds <= 0) {
-    throw new Error('durationSeconds must be greater than 0.');
+    throw new RenderConfigError('durationSeconds must be greater than 0.');
   }
 
   if (getTotalFrames(config) > MAX_TOTAL_FRAMES) {
-    throw new Error(
+    throw new RenderConfigError(
       `Render is too large. Limit is ${MAX_TOTAL_FRAMES} total frames.`
     );
   }
@@ -93,13 +102,19 @@ export function validateRenderConfig(config: SketchConfig): void {
       config.pixelDensity <= 0 ||
       config.pixelDensity > 4)
   ) {
-    throw new Error('pixelDensity must be greater than 0 and no more than 4.');
+    throw new RenderConfigError(
+      'pixelDensity must be greater than 0 and no more than 4.'
+    );
+  }
+
+  if (config.seed !== undefined && !Number.isSafeInteger(config.seed)) {
+    throw new RenderConfigError('seed must be an integer.');
   }
 }
 
 export function validateRenderOptions(options: RenderOptions): void {
   if (options.format !== undefined && !IMAGE_FORMATS.includes(options.format)) {
-    throw new Error('format must be png or jpeg.');
+    throw new RenderConfigError('format must be png or jpeg.');
   }
 
   if (
@@ -108,39 +123,41 @@ export function validateRenderOptions(options: RenderOptions): void {
       options.quality < 0 ||
       options.quality > 100)
   ) {
-    throw new Error('quality must be between 0 and 100.');
-  }
-
-  if (
-    options.maxConcurrency !== undefined &&
-    (!Number.isInteger(options.maxConcurrency) || options.maxConcurrency < 1)
-  ) {
-    throw new Error('maxConcurrency must be a positive integer.');
+    throw new RenderConfigError('quality must be between 0 and 100.');
   }
 
   if (
     options.captureMethod !== undefined &&
     !CAPTURE_METHODS.includes(options.captureMethod)
   ) {
-    throw new Error('captureMethod must be canvas or screenshot.');
+    throw new RenderConfigError('captureMethod must be canvas or screenshot.');
+  }
+
+  if (options.debug && options.captureMethod === 'screenshot') {
+    throw new RenderConfigError('debug requires the canvas capture method.');
   }
 
   if (
     options.timeoutMs !== undefined &&
     (!Number.isFinite(options.timeoutMs) || options.timeoutMs <= 0)
   ) {
-    throw new Error('timeoutMs must be greater than 0.');
+    throw new RenderConfigError('timeoutMs must be greater than 0.');
   }
 
   if (options.p5ScriptUrl !== undefined) {
-    validateScriptUrl(options.p5ScriptUrl);
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(options.p5ScriptUrl);
+    } catch {
+      throw new RenderConfigError('p5ScriptUrl must be a valid URL.');
+    }
+    if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+      throw new RenderConfigError('p5ScriptUrl must use http or https.');
+    }
   }
 
-  if (
-    options.p5ScriptPath !== undefined &&
-    options.p5ScriptPath.trim() === ''
-  ) {
-    throw new Error('p5ScriptPath must not be empty.');
+  if (options.p5ScriptPath?.trim() === '') {
+    throw new RenderConfigError('p5ScriptPath must not be empty.');
   }
 }
 
@@ -148,93 +165,55 @@ export function getTotalFrames(config: SketchConfig): number {
   return Math.ceil(config.frameRate * config.durationSeconds);
 }
 
+/**
+ * Builds the page that hosts a sketch. Script order matters: the harness
+ * installs the seeded RNG and virtual clock before p5 or the sketch run.
+ */
 export function createSketchHTML(
   config: SketchConfig,
   options: RenderOptions = {}
 ): string {
-  validateRenderOptions(options);
+  const settings: HarnessSettings = {
+    width: config.width,
+    height: config.height,
+    frameRate: config.frameRate,
+    totalFrames: getTotalFrames(config),
+    seed: config.seed ?? DEFAULT_SEED,
+    pixelDensity: config.pixelDensity ?? DEFAULT_PIXEL_DENSITY,
+    format: options.format ?? 'png',
+    quality:
+      options.quality === undefined
+        ? undefined
+        : Math.min(1, Math.max(0, options.quality / 100)),
+    debug: options.debug ?? false,
+    encoderCount: Math.max(1, Math.min(4, availableParallelism() - 1))
+  };
+  const workerSource = `(${encodeWorker.toString()})();`;
 
-  const p5Source = createP5ScriptSource(options);
-  const backgroundColor = config.backgroundColor ?? 'black';
-  const pixelDensity = config.pixelDensity ?? DEFAULT_PIXEL_DENSITY;
-
-  return `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  ${p5Source.tag}
   <style>
     html, body {
       width: ${config.width}px;
       height: ${config.height}px;
       margin: 0;
-      padding: 0;
       overflow: hidden;
-      background: ${backgroundColor};
+      background: ${escapeHtml(config.backgroundColor ?? 'black')};
     }
-
-    canvas {
-      display: block;
-    }
+    canvas { display: block; }
   </style>
+  <script>
+    (${installHarness.toString()})(${JSON.stringify(settings)});
+    window.__p5Harness.startEncoders(${JSON.stringify(workerSource).replaceAll('</', '<\\/')});
+  </script>
+  <script src="${escapeHtml(getP5ScriptUrl(options))}"></script>
+  <script>window.__p5Harness.patchP5();</script>
+  <script src="${SKETCH_PATH}"></script>
+  <script>window.__p5Harness.attachGlobal();</script>
 </head>
-<body>
-  <script>
-    window.__p5RenderReady = false;
-    window.__p5RenderCurrentFrame = 0;
-    window.__p5Runtime = ${JSON.stringify(p5Source.description)};
-    window.__p5RenderOptions = ${JSON.stringify({
-      width: config.width,
-      height: config.height,
-      frameRate: config.frameRate,
-      pixelDensity
-    })};
-
-    if (window.performance && window.performance.mark) {
-      window.performance.mark('p5-render-start');
-    }
-  </script>
-  <script>
-${escapeInlineScript(config.code)}
-  </script>
-  <script>
-    const __p5UserSetup = window.setup;
-    const __p5UserDraw = window.draw;
-
-    window.setup = function setup() {
-      pixelDensity(${pixelDensity});
-      frameRate(${config.frameRate});
-
-      if (__p5UserSetup) {
-        __p5UserSetup.call(this);
-      }
-
-      if (!document.querySelector('canvas')) {
-        createCanvas(${config.width}, ${config.height});
-      }
-
-      noLoop();
-      window.__p5RenderReady = true;
-    };
-
-    window.draw = function draw() {
-      const frameNumber = window.__p5RenderCurrentFrame || 0;
-      frameCount = frameNumber + 1;
-      window.frameCount = frameNumber + 1;
-
-      if (__p5UserDraw) {
-        __p5UserDraw.call(this);
-      }
-    };
-
-    window.__p5RenderFrame = async function renderFrame(frameNumber) {
-      window.__p5RenderCurrentFrame = frameNumber;
-      redraw();
-    };
-  </script>
-</body>
+<body></body>
 </html>`;
 }
 
@@ -251,10 +230,10 @@ export class P5Renderer {
 
     if (!P5Renderer.sharedBrowser) {
       P5Renderer.browserLaunchPromise ??= chromium.launch({
-        headless: true,
         args: [
-          '--no-sandbox',
           '--disable-dev-shm-usage',
+          // Lets WebGL fall back to software rendering on GPU-less CI machines.
+          '--enable-unsafe-swiftshader',
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
           '--disable-renderer-backgrounding'
@@ -263,105 +242,59 @@ export class P5Renderer {
 
       try {
         P5Renderer.sharedBrowser = await P5Renderer.browserLaunchPromise;
-      } catch (error) {
+      } finally {
         P5Renderer.browserLaunchPromise = null;
-        throw error;
       }
-      P5Renderer.browserLaunchPromise = null;
     }
 
     P5Renderer.browserRefCount++;
     this.browser = P5Renderer.sharedBrowser;
   }
 
+  /**
+   * Renders frames strictly in order on one page, yielding each as soon as it
+   * is encoded. Sequential drawing keeps stateful sketches (trails, particle
+   * systems, simulations) correct; a worker pool in the page compresses
+   * frames in parallel, and the next batch renders while this one is consumed.
+   */
+  async *streamFrames(
+    config: SketchConfig,
+    options: RenderOptions = {}
+  ): AsyncGenerator<FrameData> {
+    if (!this.browser) {
+      throw new Error('Renderer not initialized. Call initialize() first.');
+    }
+
+    const resolvedConfig = resolveRenderConfig(config);
+    validateRenderOptions(options);
+
+    const context = await this.browser.newContext({
+      viewport: { width: resolvedConfig.width, height: resolvedConfig.height },
+      deviceScaleFactor: 1
+    });
+    try {
+      const page = await context.newPage();
+      await openSketch(page, resolvedConfig, options);
+      yield* prefetch(captureFrames(page, resolvedConfig, options));
+    } finally {
+      await context.close();
+    }
+  }
+
   async renderSketch(
     config: SketchConfig,
     options: RenderOptions = {}
   ): Promise<RenderResult> {
-    if (!this.browser) {
-      throw new Error('Renderer not initialized. Call initialize() first.');
+    const startTime = performance.now();
+    const frames: FrameData[] = [];
+    for await (const frame of this.streamFrames(config, options)) {
+      frames.push(frame);
     }
-
-    const actualConfig = resolveRenderConfig(config);
-    validateRenderOptions(options);
-
-    const totalFrames = getTotalFrames(actualConfig);
-    const startTime = Date.now();
-    const maxConcurrency = getMaxConcurrency(
-      totalFrames,
-      options.maxConcurrency
-    );
-    const frameNumbers = Array.from(
-      { length: totalFrames },
-      (_, index) => index
-    );
-    const chunks = distributeFrames(frameNumbers, maxConcurrency);
-
-    const chunkResults = await Promise.all(
-      chunks.map(async (chunk) => {
-        return await this.renderFrameChunk(actualConfig, chunk, options);
-      })
-    );
-
-    const frames = chunkResults
-      .flat()
-      .sort((a, b) => a.frameNumber - b.frameNumber);
-
     return {
-      totalFrames,
+      totalFrames: frames.length,
       frames,
-      durationMs: Date.now() - startTime
+      durationMs: Math.round(performance.now() - startTime)
     };
-  }
-
-  async renderFrame(
-    config: SketchConfig,
-    frameNumber: number,
-    options: RenderOptions = {}
-  ): Promise<FrameData> {
-    if (!this.browser) {
-      throw new Error('Renderer not initialized. Call initialize() first.');
-    }
-
-    const actualConfig = resolveRenderConfig(config);
-    validateRenderOptions(options);
-
-    const [frame] = await this.renderFrameChunk(
-      actualConfig,
-      [frameNumber],
-      options
-    );
-    return frame;
-  }
-
-  private async renderFrameChunk(
-    config: SketchConfig,
-    frameNumbers: number[],
-    options: RenderOptions
-  ): Promise<FrameData[]> {
-    const context = await this.browser!.newContext({
-      viewport: { width: config.width, height: config.height },
-      deviceScaleFactor: 1
-    });
-    const page = await context.newPage();
-
-    try {
-      await preparePage(page, config, options);
-
-      const frames: FrameData[] = [];
-      for (const frameNumber of frameNumbers) {
-        const buffer = await captureFrame(page, config, frameNumber, options);
-        frames.push({
-          frameNumber,
-          timestamp: frameNumber / config.frameRate,
-          buffer
-        });
-      }
-
-      return frames;
-    } finally {
-      await context.close();
-    }
   }
 
   async cleanup(): Promise<void> {
@@ -370,198 +303,197 @@ export class P5Renderer {
     }
 
     P5Renderer.browserRefCount--;
+    this.browser = null;
 
     if (P5Renderer.browserRefCount <= 0 && P5Renderer.sharedBrowser) {
-      await P5Renderer.sharedBrowser.close();
+      const browser = P5Renderer.sharedBrowser;
       P5Renderer.sharedBrowser = null;
-      P5Renderer.browserLaunchPromise = null;
       P5Renderer.browserRefCount = 0;
+      await browser.close();
     }
-
-    this.browser = null;
   }
 }
 
-async function preparePage(
+async function openSketch(
   page: Page,
   config: SketchConfig,
   options: RenderOptions
 ): Promise<void> {
-  const htmlContent = createSketchHTML(config, options);
-  await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction('window.p5 && window.__p5RenderReady === true', {
-    timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS
-  });
-}
+  const html = createSketchHTML(config, options);
+  const assetRoot = config.assetDir ? resolve(config.assetDir) : null;
 
-async function captureFrame(
-  page: Page,
-  config: SketchConfig,
-  frameNumber: number,
-  options: RenderOptions
-): Promise<Buffer> {
-  if (options.captureMethod === 'screenshot') {
-    return await captureFrameScreenshot(page, config, frameNumber, options);
-  }
-
-  try {
-    return await captureFrameCanvas(page, frameNumber, options);
-  } catch (error) {
-    if (options.captureMethod === 'canvas') {
-      throw error;
+  await page.route(`${ORIGIN}/**`, async (route) => {
+    const { pathname } = new URL(route.request().url());
+    if (pathname === '/') {
+      return route.fulfill({ contentType: 'text/html', body: html });
     }
-    return await captureFrameScreenshot(page, config, frameNumber, options);
-  }
-}
-
-async function captureFrameCanvas(
-  page: Page,
-  frameNumber: number,
-  options: RenderOptions
-): Promise<Buffer> {
-  const dataUrl = await page.evaluate(
-    async ({ frame, format, quality }) => {
-      await window.__p5RenderFrame(frame);
-
-      const canvas = document.querySelector('canvas');
-      if (!canvas) {
-        throw new Error('Sketch did not create a canvas.');
+    if (pathname === SKETCH_PATH) {
+      return route.fulfill({
+        contentType: 'text/javascript',
+        body: config.code
+      });
+    }
+    if (pathname === LOCAL_P5_PATH) {
+      return route.fulfill({
+        contentType: 'text/javascript',
+        body: readP5Code(options.p5ScriptPath)
+      });
+    }
+    if (assetRoot) {
+      const file = resolve(assetRoot, `.${decodeURIComponent(pathname)}`);
+      if (file.startsWith(assetRoot + sep) && existsSync(file)) {
+        // fulfill({ path }) infers the content type from the extension.
+        return route.fulfill({ path: file });
       }
-
-      const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-      return canvas.toDataURL(mimeType, quality);
-    },
-    {
-      frame: frameNumber,
-      format: options.format ?? 'png',
-      quality: normalizeCanvasQuality(options.quality)
     }
-  );
+    return route.fulfill({ status: 404, body: 'Not found' });
+  });
 
-  const base64Data = dataUrl.split(',')[1];
-  if (!base64Data) {
-    throw new Error('Canvas capture did not return image data.');
+  await page.goto(`${ORIGIN}/`, { waitUntil: 'load' });
+
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  let status: HarnessStatus | null;
+  try {
+    const handle = await page.waitForFunction(
+      () => {
+        const current = window.__p5Harness?.status();
+        return current && (current.ready || current.error) ? current : null;
+      },
+      undefined,
+      { timeout: timeoutMs, polling: 25 }
+    );
+    status = await handle.jsonValue();
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      throw new Error(
+        `Sketch setup did not finish within ${timeoutMs}ms. Check for errors, missing assets or a setup() that never resolves.`,
+        { cause: error }
+      );
+    }
+    throw error;
   }
 
-  return Buffer.from(base64Data, 'base64');
+  if (status?.error) {
+    throw new Error(`Sketch failed during setup: ${status.error}`);
+  }
 }
 
-async function captureFrameScreenshot(
+async function* captureFrames(
   page: Page,
   config: SketchConfig,
-  frameNumber: number,
   options: RenderOptions
-): Promise<Buffer> {
-  await page.evaluate(async (frame) => {
-    await window.__p5RenderFrame(frame);
-  }, frameNumber);
+): AsyncGenerator<FrameData> {
+  const totalFrames = getTotalFrames(config);
+  const screenshot = options.captureMethod === 'screenshot';
+  const batchSize = screenshot ? 1 : FRAMES_PER_BATCH;
 
-  const screenshotOptions: PageScreenshotOptions = {
-    type: options.format ?? 'png',
-    clip: { x: 0, y: 0, width: config.width, height: config.height },
-    animations: 'disabled'
-  };
-
-  if (options.format === 'jpeg' && options.quality !== undefined) {
-    screenshotOptions.quality = options.quality;
-  }
-
-  return await page.screenshot(screenshotOptions);
-}
-
-function createP5ScriptSource(options: RenderOptions): P5ScriptSource {
-  if (options.p5ScriptUrl) {
-    return {
-      tag: `<script src="${escapeHtmlAttribute(options.p5ScriptUrl)}"></script>`,
-      description: options.p5ScriptUrl
+  for (let start = 0; start < totalFrames; start += batchSize) {
+    const request: BatchRequest = {
+      start,
+      count: Math.min(batchSize, totalFrames - start),
+      capture: !screenshot
     };
-  }
+    const captured: CapturedFrame[] = await page.evaluate((batch) => {
+      if (!window.__p5Harness) {
+        throw new Error('Render harness is missing from the page.');
+      }
+      return window.__p5Harness.renderBatch(batch);
+    }, request);
 
-  if (options.p5Version) {
-    const url = `https://cdn.jsdelivr.net/npm/p5@${encodeURIComponent(options.p5Version)}/lib/p5.min.js`;
-    return {
-      tag: `<script src="${url}"></script>`,
-      description: url
-    };
-  }
+    for (const frame of captured) {
+      const buffer = screenshot
+        ? await page.screenshot({
+            type: options.format ?? 'png',
+            clip: { x: 0, y: 0, width: config.width, height: config.height },
+            animations: 'disabled',
+            ...(options.format === 'jpeg' && options.quality !== undefined
+              ? { quality: options.quality }
+              : {})
+          })
+        : Buffer.from(frame.data, 'base64');
 
-  const p5ScriptPath = options.p5ScriptPath
-    ? resolve(options.p5ScriptPath)
-    : getLocalP5ScriptPath();
-  const p5Code = readFileSync(p5ScriptPath, 'utf8');
-
-  return {
-    tag: `<script>${escapeInlineScript(p5Code)}</script>`,
-    description: options.p5ScriptPath
-      ? p5ScriptPath
-      : `local p5 package ${getLocalP5Version()}`
-  };
-}
-
-function distributeFrames(frames: number[], numChunks: number): number[][] {
-  const chunks: number[][] = Array.from({ length: numChunks }, () => []);
-  frames.forEach((frame, index) => {
-    chunks[index % numChunks].push(frame);
-  });
-  return chunks.filter((chunk) => chunk.length > 0);
-}
-
-function getMaxConcurrency(totalFrames: number, requested?: number): number {
-  if (requested !== undefined) {
-    if (!Number.isInteger(requested) || requested < 1) {
-      throw new Error('maxConcurrency must be a positive integer.');
+      yield {
+        frameNumber: frame.frameNumber,
+        timestamp: frame.frameNumber / config.frameRate,
+        drawMs: frame.drawMs,
+        buffer
+      };
     }
-    return Math.min(requested, totalFrames);
   }
+}
 
-  return Math.min(Math.max(1, cpus().length), 4, totalFrames);
+/**
+ * Pulls from `source` in the background so the page keeps rendering while the
+ * consumer (for example ffmpeg) is busy. Errors surface at the point of use.
+ */
+async function* prefetch<T>(source: AsyncIterable<T>): AsyncGenerator<T> {
+  const queue: T[] = [];
+  const state: {
+    finished: boolean;
+    failure: { error: unknown } | null;
+    wake: (() => void) | null;
+  } = { finished: false, failure: null, wake: null };
+
+  void (async () => {
+    try {
+      for await (const item of source) {
+        queue.push(item);
+        state.wake?.();
+      }
+    } catch (error) {
+      state.failure = { error };
+    } finally {
+      state.finished = true;
+      state.wake?.();
+    }
+  })();
+
+  while (true) {
+    if (queue.length > 0) {
+      // shift() drops the reference so consumed frames can be collected.
+      yield queue.shift()!;
+      continue;
+    }
+    if (state.finished) {
+      if (state.failure) {
+        throw state.failure.error;
+      }
+      return;
+    }
+    const { promise, resolve: resolveWake } = Promise.withResolvers<void>();
+    state.wake = resolveWake;
+    await promise;
+    state.wake = null;
+  }
+}
+
+function getP5ScriptUrl(options: RenderOptions): string {
+  if (options.p5ScriptUrl) {
+    return options.p5ScriptUrl;
+  }
+  if (options.p5Version) {
+    return `https://cdn.jsdelivr.net/npm/p5@${encodeURIComponent(options.p5Version)}/lib/p5.min.js`;
+  }
+  return LOCAL_P5_PATH;
+}
+
+function readP5Code(scriptPath: string | undefined): string {
+  const path = scriptPath
+    ? resolve(scriptPath)
+    : join(dirname(dirname(require.resolve('p5'))), 'lib', 'p5.min.js');
+  let code = p5CodeCache.get(path);
+  if (code === undefined) {
+    code = readFileSync(path, 'utf8');
+    p5CodeCache.set(path, code);
+  }
+  return code;
 }
 
 function isValidDimension(value: number): boolean {
   return Number.isInteger(value) && value > 0 && value <= MAX_CANVAS_DIMENSION;
 }
 
-function normalizeCanvasQuality(quality?: number): number | undefined {
-  if (quality === undefined) {
-    return undefined;
-  }
-  return Math.min(1, Math.max(0, quality / 100));
-}
-
-function getLocalP5ScriptPath(): string {
-  const p5EntryPoint = require.resolve('p5');
-  return join(dirname(dirname(p5EntryPoint)), 'lib', 'p5.min.js');
-}
-
-function getLocalP5Version(): string {
-  const p5EntryPoint = require.resolve('p5');
-  const packageJsonPath = join(dirname(dirname(p5EntryPoint)), 'package.json');
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as {
-    version?: unknown;
-  };
-  return typeof packageJson.version === 'string'
-    ? packageJson.version
-    : 'unknown';
-}
-
-function validateScriptUrl(scriptUrl: string): void {
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(scriptUrl);
-  } catch {
-    throw new Error('p5ScriptUrl must be a valid URL.');
-  }
-
-  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
-    throw new Error('p5ScriptUrl must use http or https.');
-  }
-}
-
-function escapeInlineScript(script: string): string {
-  return script.replaceAll('</script', '<\\/script');
-}
-
-function escapeHtmlAttribute(value: string): string {
+function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
     .replaceAll('"', '&quot;')

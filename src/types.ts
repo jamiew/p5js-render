@@ -12,6 +12,10 @@ export interface SketchConfig {
   durationSeconds: number;
   pixelDensity?: number;
   backgroundColor?: string;
+  /** Seeds Math.random, so p5 random() and noise() repeat across renders. */
+  seed?: number;
+  /** Directory the sketch can load relative assets from, such as images. */
+  assetDir?: string;
 }
 
 export interface RenderOptions {
@@ -23,15 +27,25 @@ export interface RenderOptions {
   p5ScriptUrl?: string;
   p5ScriptPath?: string;
   timeoutMs?: number;
+  /** Burns a HUD with frame, time and draw cost into captured frames. */
+  debug?: boolean;
 }
 
 export interface RenderApiRequest
-  extends SketchConfig, Omit<RenderOptions, 'p5ScriptPath'> {}
+  extends Omit<SketchConfig, 'assetDir'>, Omit<RenderOptions, 'p5ScriptPath'> {}
 
 export interface FrameData {
   frameNumber: number;
   timestamp: number;
+  /** Wall-clock milliseconds the sketch's draw() took for this frame. */
+  drawMs: number;
   buffer: Buffer;
+}
+
+export interface RenderResult {
+  totalFrames: number;
+  frames: FrameData[];
+  durationMs: number;
 }
 
 export interface RenderApiResponse {
@@ -44,27 +58,4 @@ export interface ApiFrameData {
   frameNumber: number;
   timestamp: number;
   data: string; // base64 encoded image data
-}
-
-declare global {
-  interface Window {
-    __p5RenderFrame: (frameNumber: number) => Promise<void> | void;
-    __p5RenderReady: boolean;
-    p5?: typeof import('p5');
-    setup?: () => void;
-    draw?: () => void;
-    redraw?: () => void;
-  }
-
-  var __p5RenderFrame:
-    | ((frameNumber: number) => Promise<void> | void)
-    | undefined;
-  var __p5RenderReady: boolean;
-  var redraw: (() => void) | undefined;
-}
-
-export interface RenderResult {
-  totalFrames: number;
-  frames: FrameData[];
-  durationMs: number;
 }

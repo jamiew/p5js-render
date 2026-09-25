@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fastify } from '../src/api.js';
+import { fastify } from '../src/api.ts';
 
 describe('render API validation', () => {
   it('rejects invalid render requests before launching the renderer', async () => {

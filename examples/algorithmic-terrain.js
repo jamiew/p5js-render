@@ -177,11 +177,11 @@ function drawContours(time) {
         let point = path[i];
 
         if (i === 0) {
-          curveVertex(point.x, point.y);
+          splineVertex(point.x, point.y);
         }
-        curveVertex(point.x, point.y);
+        splineVertex(point.x, point.y);
         if (i === path.length - 1) {
-          curveVertex(point.x, point.y);
+          splineVertex(point.x, point.y);
         }
       }
       endShape();
@@ -205,11 +205,11 @@ function drawRidges(time) {
       let ridgeOffset = sin(time + x * 0.1) * 2;
 
       if (x === 5) {
-        curveVertex(worldX, worldY + ridgeOffset);
+        splineVertex(worldX, worldY + ridgeOffset);
       }
-      curveVertex(worldX, worldY + ridgeOffset);
+      splineVertex(worldX, worldY + ridgeOffset);
       if (x === cols - 6) {
-        curveVertex(worldX, worldY + ridgeOffset);
+        splineVertex(worldX, worldY + ridgeOffset);
       }
     }
     endShape();

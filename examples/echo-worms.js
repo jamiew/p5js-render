@@ -84,9 +84,9 @@ class EchoWorm {
         let offsetY = sin(p1.time + echo) * 15 * phaseShift;
 
         if (i === echoDelay) {
-          curveVertex(p1.x + offsetX, p1.y + offsetY);
+          splineVertex(p1.x + offsetX, p1.y + offsetY);
         }
-        curveVertex(p1.x + offsetX, p1.y + offsetY);
+        splineVertex(p1.x + offsetX, p1.y + offsetY);
       }
 
       if (this.points.length > echoDelay + 1) {
@@ -94,7 +94,7 @@ class EchoWorm {
         let phaseShift = sin(lastPoint.time * 3 + echo * 0.5) * 0.3;
         let offsetX = cos(lastPoint.time + echo) * 15 * phaseShift;
         let offsetY = sin(lastPoint.time + echo) * 15 * phaseShift;
-        curveVertex(lastPoint.x + offsetX, lastPoint.y + offsetY);
+        splineVertex(lastPoint.x + offsetX, lastPoint.y + offsetY);
       }
 
       endShape();

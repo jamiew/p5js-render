@@ -12,4 +12,5 @@ temp/
 frames/
 videos/
 output/
+site/dist/
 *.tsbuildinfo

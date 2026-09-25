@@ -1,27 +1,23 @@
-import typescriptEslint from '@typescript-eslint/eslint-plugin';
-import typescriptParser from '@typescript-eslint/parser';
+import { defineConfig } from 'eslint/config';
+import tseslint from 'typescript-eslint';
 
-export default [
+export default defineConfig(
+  { ignores: ['dist/', 'output/', 'site/dist/', 'examples/', 'coverage/'] },
   {
-    files: ['src/**/*.ts', 'tests/**/*.ts'],
+    files: ['**/*.ts'],
+    extends: [tseslint.configs.recommendedTypeChecked],
     languageOptions: {
-      parser: typescriptParser,
       parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
         project: './tsconfig.eslint.json',
         tsconfigRootDir: import.meta.dirname
       }
     },
-    plugins: {
-      '@typescript-eslint': typescriptEslint
-    },
     rules: {
-      ...typescriptEslint.configs.recommended.rules,
-      ...typescriptEslint.configs['recommended-type-checked'].rules,
-      '@typescript-eslint/no-unused-vars': 'error',
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/explicit-function-return-type': 'off'
+      '@typescript-eslint/no-explicit-any': 'error'
     }
+  },
+  {
+    files: ['**/*.js'],
+    extends: [tseslint.configs.disableTypeChecked]
   }
-];
+);

@@ -1,28 +1,38 @@
 {
   "name": "p5js-render",
   "version": "1.0.0",
-  "description": "Offline/server-side p5.js sketch to video renderer",
-  "main": "dist/index.js",
+  "description": "Render p5.js sketches to video offline, deterministically, in headless Chromium",
   "type": "module",
-  "engines": {
-    "node": ">=22"
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
   },
-  "packageManager": "npm@11.13.0",
+  "bin": {
+    "p5js-render": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "examples"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@11.21.0",
   "scripts": {
     "build": "tsc",
-    "dev": "tsx src/index.ts",
-    "start": "tsx src/index.ts",
-    "start:prod": "node dist/index.js",
+    "dev": "node --watch src/server.ts",
+    "start": "node src/server.ts",
+    "render": "node src/cli.ts",
+    "render:all": "node src/cli.ts --all",
+    "media": "node scripts/build-media.ts",
+    "site": "node scripts/build-site.ts",
     "test": "vitest",
-    "render": "tsx src/cli.ts",
-    "render:url": "tsx src/cli.ts url",
-    "render:code": "tsx src/cli.ts code",
-    "render:all": "tsx src/cli.ts all",
-    "lint": "eslint src tests --ext .ts",
+    "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm test -- --run"
+    "typecheck": "tsc --noEmit -p tsconfig.eslint.json",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test --run"
   },
   "keywords": [
     "p5js",
@@ -31,22 +41,20 @@
     "headless",
     "typescript"
   ],
-  "author": "",
+  "repository": "github:jamiew/p5js-renderer",
   "license": "MIT",
   "dependencies": {
-    "@fastify/cors": "^11.2.0",
-    "fastify": "^5.8.5",
-    "p5": "^2.2.3",
-    "playwright": "^1.59.1"
+    "@fastify/cors": "^11.3.0",
+    "fastify": "^5.12.5",
+    "p5": "^2.3.3",
+    "playwright": "^1.63.0"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
-    "@typescript-eslint/eslint-plugin": "^8.59.2",
-    "@typescript-eslint/parser": "^8.59.2",
-    "eslint": "^10.3.0",
-    "prettier": "^3.8.3",
-    "tsx": "^4.21.0",
+    "@types/node": "^22.20.4",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.9",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^5.0.1"
   }
 }
