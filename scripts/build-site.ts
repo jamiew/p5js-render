@@ -386,8 +386,9 @@ function jsonLd(items: SiteItem[], builtAt: string): string {
         'p5.js, generative art, creative coding, video rendering, headless Chromium, Playwright, ffmpeg, GIF, MP4',
       author: {
         '@type': 'Person',
-        name: 'jamiew',
-        url: 'https://github.com/jamiew'
+        name: 'Jamie Wilkinson',
+        url: 'https://jamiedubs.com',
+        sameAs: ['https://github.com/jamiew']
       },
       image: `${SITE_URL}assets/og.jpg`
     },
