@@ -22,10 +22,13 @@ const SITE_URL = 'https://jamiew.github.io/p5js-render/';
 const REPO_URL = 'https://github.com/jamiew/p5js-render';
 const SIZE = 720;
 const REEL_SIZE = 288;
-// Scrub sprites hold at most this many thumbnails, SPRITE_CELL pixels square.
+// Frame sprites hold at most this many thumbnails in a 10-column grid. A small
+// sprite fills the film strip as the card scrolls in; a sharp one loads when
+// someone reaches for the strip, for the full-size preview while scrubbing.
 const SPRITE_MAX_CELLS = 48;
 const SPRITE_COLUMNS = 10;
-const SPRITE_CELL = 180;
+const STRIP_CELL = 96;
+const SCRUB_CELL = 360;
 const STRIP_CELLS = 10;
 
 const DESCRIPTION =
@@ -67,6 +70,7 @@ const FAQ: { question: string; answer: string }[] = [
 
 interface Sprite {
   url: string;
+  scrubUrl: string;
   step: number;
   cells: number;
   columns: number;
@@ -166,22 +170,44 @@ async function buildItem(
       '-y',
       '-i',
       path.join(scratch, 'cell_%d.png'),
-      '-vf',
-      `scale=${SPRITE_CELL}:${SPRITE_CELL}:flags=lanczos,tile=${columns}x${rows}`,
+      '-filter_complex',
+      [
+        `tile=${columns}x${rows},split[a][b]`,
+        `[a]scale=${columns * SCRUB_CELL}:${rows * SCRUB_CELL}:flags=lanczos[scrub]`,
+        `[b]scale=${columns * STRIP_CELL}:${rows * STRIP_CELL}:flags=lanczos[strip]`
+      ].join(';'),
+      '-map',
+      '[scrub]',
       '-frames:v',
       '1',
-      path.join(scratch, 'sprite.png')
+      path.join(scratch, 'scrub.png'),
+      '-map',
+      '[strip]',
+      '-frames:v',
+      '1',
+      path.join(scratch, 'strip.png')
     ]);
     await Promise.all([
       run('cwebp', [
         '-quiet',
         '-q',
-        '55',
+        '75',
         '-m',
         '6',
-        path.join(scratch, 'sprite.png'),
+        path.join(scratch, 'strip.png'),
         '-o',
         media('-sprite.webp')
+      ]),
+      run('cwebp', [
+        '-quiet',
+        '-q',
+        '72',
+        '-m',
+        '6',
+        '-sharp_yuv',
+        path.join(scratch, 'scrub.png'),
+        '-o',
+        media('-scrub.webp')
       ]),
       run('cwebp', [
         '-quiet',
@@ -247,6 +273,7 @@ async function buildItem(
     reelPoster: `media/${item.name}-reel.webp`,
     sprite: {
       url: `media/${item.name}-sprite.webp`,
+      scrubUrl: `media/${item.name}-scrub.webp`,
       step,
       cells: spriteFrames.length,
       columns,
@@ -278,7 +305,7 @@ function cardHtml(item: SiteItem): string {
 <article class="card" id="${item.name}" aria-labelledby="${item.name}-title"
   data-frames="${item.frames}" data-fps="${FRAME_RATE}" data-duration="${item.durationSeconds}"
   data-video="${item.video}" data-debug-video="${item.debugVideo}"
-  data-sprite="${item.sprite.url}" data-sprite-step="${item.sprite.step}"
+  data-sprite="${item.sprite.url}" data-scrub-sprite="${item.sprite.scrubUrl}" data-sprite-step="${item.sprite.step}"
   data-sprite-columns="${item.sprite.columns}" data-sprite-rows="${item.sprite.rows}">
   <div class="stage">
     <video class="clip" muted loop playsinline controls preload="none" width="${SIZE}" height="${SIZE}"

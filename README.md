@@ -8,7 +8,7 @@ Render p5.js sketches to MP4, WebM or GIF in headless Chromium. Every frame is d
 
 <p align="center"><img src="docs/media/site-demo.webp" alt="The demo site: switching the gallery to debug HUD videos, then dragging a film strip to scrub frame by frame" width="640"></p>
 
-On the site, each example has a film strip you can drag or step through with the arrow keys. A sprite sheet of thumbnails gives instant previews while you scrub, then the video jumps to the exact frame. The Debug HUD toggle swaps every video for its `--debug` render.
+On the site, each example has a film strip you can drag or step through with the arrow keys. A small sprite sheet fills the strip as the card scrolls in, and a sharp one loads when you reach for it, so scrubbing previews are instant. When you pause or let go, the video jumps to the exact frame. The Debug HUD toggle swaps every video for its `--debug` render.
 
 ## Gallery
 

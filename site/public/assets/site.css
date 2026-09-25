@@ -139,12 +139,10 @@ nav a:hover {
   --frame: clamp(120px, 16vw, 196px);
   --gap: 16px;
   position: relative;
-  /* Rotation lifts one end and drops the other by about tan(5deg) * 50vw. */
-  margin: calc(4.5vw + 24px) -10vw calc(4.5vw + 32px);
-  padding: 36px 0;
+  margin: 28px 0 24px;
+  padding: 30px 0;
   background: #17181c;
-  transform: rotate(-5deg);
-  box-shadow: 0 30px 60px rgb(0 0 0 / 45%);
+  box-shadow: 0 24px 48px rgb(0 0 0 / 40%);
 }
 
 .reel::before,
@@ -158,11 +156,11 @@ nav a:hover {
 }
 
 .reel::before {
-  top: 8px;
+  top: 5px;
 }
 
 .reel::after {
-  bottom: 8px;
+  bottom: 5px;
 }
 
 .reel-track {
@@ -193,7 +191,7 @@ nav a:hover {
 .reel-frame::after {
   content: attr(data-number);
   position: absolute;
-  bottom: -14px;
+  bottom: -11px;
   left: 2px;
   font: 600 9px/1 var(--mono);
   letter-spacing: 0.1em;
@@ -358,7 +356,7 @@ pre .c {
 .scrub-preview {
   position: absolute;
   inset: 0;
-  background-image: var(--sprite);
+  background-image: var(--scrub, var(--sprite));
   background-size: calc(var(--sprite-columns) * 100%)
     calc(var(--sprite-rows) * 100%);
   pointer-events: none;

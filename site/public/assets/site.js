@@ -60,19 +60,23 @@ for (const video of document.querySelectorAll('.reel video, .remix-video')) {
   viewport.observe(video);
 }
 
-// Sprite sheets load shortly before a card scrolls into view.
+// Resolves to an absolute URL once the image is decoded. Absolute, because
+// url() inside a custom property resolves against the stylesheet, not the page.
+const loadImage = (path) => {
+  const url = new URL(path, document.baseURI).href;
+  const image = new Image();
+  image.src = url;
+  return image.decode().then(() => url);
+};
+
+// Small strip sprites load shortly before a card scrolls into view.
 const spriteLoader = new IntersectionObserver(
   (entries) => {
     for (const { target: card, isIntersecting } of entries) {
       if (!isIntersecting) continue;
       spriteLoader.unobserve(card);
-      const url = new URL(card.dataset.sprite, document.baseURI).href;
-      const image = new Image();
-      image.src = url;
-      image
-        .decode()
-        .then(() => {
-          // Absolute, because url() inside a custom property resolves against the stylesheet.
+      loadImage(card.dataset.sprite)
+        .then((url) => {
           card.style.setProperty('--sprite', `url("${url}")`);
           card.classList.add('sprite-ready');
         })
@@ -95,6 +99,18 @@ for (const card of document.querySelectorAll('.card')) {
   const columns = Number(card.dataset.spriteColumns);
   const rows = Number(card.dataset.spriteRows);
   let frame = 0;
+  let scrubSprite = null;
+  let exactSeek = 0;
+
+  // The sharp scrub sprite is large, so it loads only when someone reaches for
+  // the strip. Until it arrives the preview upscales the small strip sprite.
+  const loadScrubSprite = () => {
+    scrubSprite ??= loadImage(card.dataset.scrubSprite)
+      .then((url) => card.style.setProperty('--scrub', `url("${url}")`))
+      .catch(() => {});
+  };
+  film.addEventListener('pointerenter', loadScrubSprite);
+  film.addEventListener('focus', loadScrubSprite);
 
   // The custom film strip replaces the native controls once JS is running.
   video.removeAttribute('controls');
@@ -133,25 +149,30 @@ for (const card of document.querySelectorAll('.card')) {
       render(Math.floor(video.currentTime * fps))
     );
 
-  // While scrubbing, the sprite gives instant thumbnails; the video catches up
-  // to the exact frame once the pointer lets go.
+  // While scrubbing, the sprite gives instant thumbnails. When the pointer
+  // rests, or lets go, the video seeks to the exact frame and replaces it.
+  const settle = () => {
+    const target = frame;
+    video.currentTime = (target + 0.5) / fps;
+    video.addEventListener(
+      'seeked',
+      () => {
+        // Mid-drag, keep the preview if the pointer has already moved on.
+        if (!card.dataset.scrubbing || frame === target) preview.hidden = true;
+      },
+      { once: true }
+    );
+  };
+
   const showPreview = () => {
-    if (!card.classList.contains('sprite-ready')) {
-      video.currentTime = (frame + 0.5) / fps;
-      return;
-    }
+    clearTimeout(exactSeek);
+    exactSeek = setTimeout(settle, 140);
+    if (!card.classList.contains('sprite-ready')) return;
     const cell = Math.min(Math.round(frame / step), columns * rows - 1);
     const x = columns > 1 ? ((cell % columns) / (columns - 1)) * 100 : 0;
     const y = rows > 1 ? (Math.floor(cell / columns) / (rows - 1)) * 100 : 0;
     preview.style.backgroundPosition = `${x}% ${y}%`;
     preview.hidden = false;
-  };
-
-  const settle = () => {
-    video.currentTime = (frame + 0.5) / fps;
-    video.addEventListener('seeked', () => (preview.hidden = true), {
-      once: true
-    });
   };
 
   const seekTo = (frameNumber) => {
@@ -166,6 +187,7 @@ for (const card of document.querySelectorAll('.card')) {
 
   film.addEventListener('pointerdown', (event) => {
     film.setPointerCapture(event.pointerId);
+    loadScrubSprite();
     card.dataset.scrubbing = 'true';
     video.pause();
     seekTo(fromPointer(event));
@@ -176,6 +198,7 @@ for (const card of document.querySelectorAll('.card')) {
   const release = () => {
     if (!card.dataset.scrubbing) return;
     delete card.dataset.scrubbing;
+    clearTimeout(exactSeek);
     settle();
     playIfAllowed(video);
   };
