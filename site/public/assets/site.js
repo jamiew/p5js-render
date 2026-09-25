@@ -13,6 +13,49 @@ const announce = (message) => {
   requestAnimationFrame(() => (liveRegion.textContent = message));
 };
 
+// Light, dark or system theme. The inline script in <head> applies a saved
+// choice before paint; this keeps the buttons and browser chrome in sync.
+const themeButtons = [...document.querySelectorAll('[data-theme-choice]')];
+const themeColors = { light: '#f4f1ea', dark: '#0b0c0f' };
+const themeMetas = [...document.querySelectorAll('meta[name="theme-color"]')];
+
+const applyTheme = (choice) => {
+  if (choice === 'system') delete root.dataset.theme;
+  else root.dataset.theme = choice;
+  for (const button of themeButtons) {
+    button.setAttribute(
+      'aria-pressed',
+      String(button.dataset.themeChoice === choice)
+    );
+  }
+  for (const meta of themeMetas) {
+    const scheme = meta.media.includes('light') ? 'light' : 'dark';
+    meta.content = themeColors[choice === 'system' ? scheme : choice];
+  }
+};
+
+let savedTheme = 'system';
+try {
+  savedTheme = localStorage.getItem('theme') ?? 'system';
+} catch {}
+applyTheme(
+  themeButtons.some((b) => b.dataset.themeChoice === savedTheme)
+    ? savedTheme
+    : 'system'
+);
+
+for (const button of themeButtons) {
+  button.addEventListener('click', () => {
+    const choice = button.dataset.themeChoice;
+    applyTheme(choice);
+    try {
+      if (choice === 'system') localStorage.removeItem('theme');
+      else localStorage.setItem('theme', choice);
+    } catch {}
+    announce(`${button.textContent.trim()} theme`);
+  });
+}
+
 // Videos only load and play while on screen, and only when motion is on.
 const playIfAllowed = (video) => {
   if (
